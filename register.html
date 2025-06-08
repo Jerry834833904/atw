@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>注册</title>
+  <style>
+    #message {
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      display: none;
+      background-color: #f0f0f0;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h2>注册</h2>
+
+  <!-- 提示信息显示位置 -->
+  <div id="message"></div>
+
+  <input type="email" id="email" placeholder="邮箱">
+  <input type="password" id="password" placeholder="密码">
+  <button onclick="register()">注册</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <script>
+    async function register() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const msgBox = document.getElementById("message");
+
+      const { error } = await supabase.auth.signUp({ email, password });
+
+      if (error) {
+        msgBox.style.display = "block";
+        msgBox.style.color = "red";
+        msgBox.innerText = "注册失败：" + error.message + "，请联系微信：Jeri926";
+      } else {
+        msgBox.style.display = "block";
+        msgBox.style.color = "green";
+        msgBox.innerText = "注册成功，请登录";
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>播放视频</title></head>
+<body>
+<h2>播放视频</h2>
+<video id="player" width="640" height="360" controls autoplay></video>
+<script>
+const params = new URLSearchParams(window.location.search);
+const url = params.get("url");
+if (url) {
+    const video = document.getElementById("player");
+    video.src = decodeURIComponent(url);
+} else {
+    document.body.innerHTML = "<p>未提供视频链接</p>";
+}
+</script>
+</body>
+</html>

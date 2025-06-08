@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>上传视频</title></head>
+<body>
+<h2>上传视频</h2>
+<input type="text" id="title" placeholder="视频标题"><br>
+<input type="file" id="videoFile" accept="video/mp4"><br>
+<button onclick="upload()">上传</button>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="supabase.js"></script>
+<script>
+async function upload() {
+    const file = document.getElementById("videoFile").files[0];
+    const title = document.getElementById("title").value;
+    if (!file || !title) {
+        alert("请填写标题并选择视频");
+        return;
+    }
+    const filePath = `${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage.from("videos").upload(filePath, file);
+    if (uploadError) {
+        alert("上传失败: " + uploadError.message);
+        return;
+    }
+    const { data } = supabase.storage.from("videos").getPublicUrl(filePath);
+    const videoUrl = data.publicUrl;
+    await supabase.from("videos").insert([{ title, url: videoUrl }]);
+    alert("上传成功");
+    window.location.href = "index.html";
+}
+</script>
+</body>
+</html>
