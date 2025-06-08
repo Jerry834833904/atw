@@ -1,18 +1,63 @@
+
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>播放视频</title></head>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>播放视频</title>
+</head>
 <body>
-<h2>播放视频</h2>
-<video id="player" width="640" height="360" controls autoplay></video>
-<script>
-const params = new URLSearchParams(window.location.search);
-const url = params.get("url");
-if (url) {
-    const video = document.getElementById("player");
-    video.src = decodeURIComponent(url);
-} else {
-    document.body.innerHTML = "<p>未提供视频链接</p>";
-}
-</script>
+  <h2>视频播放</h2>
+  <video id="video" width="640" height="360" controls></video>
+  <h3>评论区</h3>
+  <div id="comments"></div>
+  <textarea id="commentText" placeholder="写下你的评论..." rows="3" cols="60"></textarea><br>
+  <button onclick="postComment()">发表评论</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoId = urlParams.get('id');
+
+    async function loadVideo() {
+      const { data, error } = await supabase.from('videos').select('*').eq('id', videoId).single();
+      if (data) {
+        document.getElementById('video').src = data.url;
+      }
+    }
+
+    async function loadComments() {
+      const { data, error } = await supabase.from('comments').select('content, created_at, user_id').eq('video_id', videoId).order('created_at', { ascending: false });
+      const container = document.getElementById('comments');
+      if (error) return container.innerHTML = '评论加载失败';
+      container.innerHTML = data.map(c => \`
+        <div style="margin-bottom:10px;">
+          <strong>\${c.user_id}</strong> 说：<br>
+          \${c.content}<br>
+          <small>\${new Date(c.created_at).toLocaleString()}</small>
+        </div>
+      \`).join('');
+    }
+
+    async function postComment() {
+      const commentText = document.getElementById("commentText").value;
+      const user = await supabase.auth.getUser();
+      const userId = user.data.user.id;
+      const { error } = await supabase.from("comments").insert({
+        video_id: videoId,
+        user_id: userId,
+        content: commentText
+      });
+      if (error) alert("评论失败：" + error.message);
+      else {
+        alert("评论成功！");
+        document.getElementById("commentText").value = "";
+        loadComments();
+      }
+    }
+
+    loadVideo();
+    loadComments();
+  </script>
 </body>
 </html>

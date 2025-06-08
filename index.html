@@ -1,23 +1,26 @@
+
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><title>视频列表</title></head>
+<head><meta charset="UTF-8"><title>视频首页</title></head>
 <body>
-<h1>视频列表</h1>
-<ul id="videoList"></ul>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script src="supabase.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", async () => {
-    const { data, error } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
-    const list = document.getElementById("videoList");
-    if (data) {
-        data.forEach(v => {
-            const li = document.createElement("li");
-            li.innerHTML = `<a href="player.html?url=${encodeURIComponent(v.url)}">${v.title}</a>`;
-            list.appendChild(li);
-        });
+  <h2>最新视频</h2>
+  <div id="list"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <script>
+    async function loadVideos() {
+      const { data, error } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+      const list = document.getElementById('list');
+      if (error) return list.innerHTML = '加载失败';
+      list.innerHTML = data.map(v => \`
+        <div>
+          <h3>\${v.title}</h3>
+          <video width="320" controls src="\${v.url}"></video>
+          <a href="player.html?id=\${v.id}">▶ 播放</a>
+        </div>
+      \`).join('');
     }
-});
-</script>
+    loadVideos();
+  </script>
 </body>
 </html>
