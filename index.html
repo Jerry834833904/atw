@@ -3,66 +3,73 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>欢乐水果机（纯代码版）</title>
+<title>Fruit</title>
 <style>
-*{margin:0;padding:0;list-style:none;text-decoration:none;box-sizing:border-box}
+*{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f6fa;color:#111}
 #content{max-width:520px;margin:0 auto;padding:12px;text-align:center}
 
-/* 让原有像素坐标保持不变；通过整体缩放适配手机 */
+/* —— 用整体缩放适配手机：内部仍按你原来像素坐标 —— */
 .scale-wrap{width:1000px;height:1200px;margin:0 auto;transform-origin:top center;position:relative}
 @media (max-width:520px){
   .scale-wrap{transform:scale(calc((100vw - 24px)/1000));
-    height:calc(1200px * ((100vw - 24px)/1000));}
+              height:calc(1200px * ((100vw - 24px)/1000));}
 }
 
-/* 盘面：不改顺序与逻辑 */
+/* —— 盘面（坐标/顺序/逻辑不变） —— */
 .box{width:1000px;height:1200px;background:#2b62ff;position:relative;border-radius:12px}
 .top{width:600px;height:100px;display:flex;position:absolute;top:50px;left:150px}
 .right{width:100px;height:600px;position:absolute;top:50px;right:150px;display:flex;flex-direction:column}
 .bottom{width:600px;height:100px;display:flex;flex-direction:row-reverse;position:absolute;top:650px;right:150px}
 .left{width:100px;height:600px;display:flex;flex-flow:column-reverse;position:absolute;top:150px;left:150px}
 
-/* 统一图标尺寸 */
-.cell{width:98px;height:98px;border:1px solid #000;background:#fff;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:42px;user-select:none}
+/* 统一图标尺寸（盘面每格 98×98） */
+.cell{
+  width:98px;height:98px;border:1px solid #000;background:#fff;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:42px;user-select:none
+}
 .double{letter-spacing:1px}
-.lucky{font-size:32px;} /* LUCKY 更小，在框内更稳 */
+.lucky{font-size:32px} /* LUCKY 更小，完全在框内 */
 
-#move{display:block;width:98px;height:98px;position:absolute;top:50px;left:150px;
-  border:3px solid #ffd400;           /* 黄色描边 */
-  outline:4px solid rgba(255,212,0,.35); /* 外发光，不覆盖内容 */
-  background:transparent;box-shadow:0 0 14px rgba(255,212,0,.55);pointer-events:none}
+/* 移动高亮：黄色，不遮内容 */
+#move{
+  display:block;width:98px;height:98px;position:absolute;top:50px;left:150px;
+  border:3px solid #ffd400;outline:4px solid rgba(255,212,0,.35);
+  box-shadow:0 0 12px rgba(255,212,0,.5), inset 0 0 6px rgba(255,212,0,.3);
+  background:transparent;pointer-events:none
+}
 
-/* 金额信息保留 */
-#getScore,#allScore{display:block;width:200px;height:50px;font-size:24px;line-height:50px;color:#111;background:#fff;border-radius:8px;position:absolute;top:200px}
+/* 金额信息（保留原 ID） */
+#getScore,#allScore{
+  display:block;width:200px;height:50px;font-size:24px;line-height:50px;color:#111;background:#fff;border-radius:8px;position:absolute;top:200px
+}
 #getScore{left:290px} #allScore{right:290px}
 #getScore>p,#allScore>p{display:inline-block;min-width:60px;font-weight:700;margin-left:8px}
 
-/* 充值按钮保留 */
+/* 充值按钮保留（原位） */
 #change{width:120px;height:36px;position:absolute;top:25px;right:15px;border-radius:8px;border:0;background:#111;color:#fff}
 
-/* —— 底部一排（与盘面底边相隔“一个按钮高度”） —— */
-:root{ --btn: clamp(44px, 10.2vw, 58px); }
-.bottom-bar{
-  display:grid; grid-template-columns:repeat(9, minmax(var(--btn),1fr)); gap:8px;
-  justify-content:center; justify-items:center; align-items:center;
-  max-width:520px; margin:calc(var(--btn) * 1) auto 6px;  /* 与盘面相隔 1 个按钮高 */
+/* —— 底部一排：放在盘面内部，精确定位在双7下面一个图标距离 —— */
+/* 双7这一排 bottom 的 top = 650，格高 = 98 → 底边 y = 748；再加一个格高 98 → 846 */
+.controlbar{
+  position:absolute; top:848px; left:50%; transform:translateX(-50%);
+  width:946px;  /* 9个按钮*98 + 8个间隔*8 = 882 + 64 = 946 */
+  display:flex;justify-content:center;gap:8px;
 }
 .btn-icon{
-  width:var(--btn); height:var(--btn);
+  width:98px;height:98px;
   display:flex;align-items:center;justify-content:center;
   background:#fff;border:1px solid #000;border-radius:10px;
-  font-size:calc(var(--btn)*0.6);font-weight:700;position:relative;user-select:none
+  font-size:58px;font-weight:700;position:relative;user-select:none
 }
 .btn-icon:active{transform:scale(.97)}
-.btn-text{font-size:calc(var(--btn)*0.55)}
+.btn-text{font-size:46px}
 .badge{
   position:absolute;right:6px;bottom:6px;min-width:22px;height:20px;padding:0 4px;
   background:#111;color:#fff;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700;
 }
 
-/* 隐藏但保留原下注结构（顺序不变，供原逻辑使用） */
+/* —— 隐藏但保留原下注结构（顺序不变，供原逻辑使用） —— */
 .stake{height:0;overflow:hidden}
 .stake .minus,.stake .add{display:none}
 .note{margin-top:6px;color:#666;font-size:12px}
@@ -70,9 +77,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
 </head>
 <body>
 <div id="content">
-  <h2>欢乐水果机（纯代码图标版）</h2>
-
-  <!-- 盘面（保持原坐标/逻辑） -->
+  <!-- 盘面：保持原像素/逻辑（整体缩放以适配手机） -->
   <div class="scale-wrap">
     <div class="box">
       <div class="top">
@@ -93,15 +98,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
         <div class="cell lucky">LUCKY</div><div class="cell">🍎</div><div class="cell">🔔</div>
       </div>
 
-      <!-- 高亮框（黄色光，不遮内容） -->
+      <!-- 高亮框（黄色描边/光晕，不遮内容） -->
       <span id="move"></span>
 
-      <!-- 金额显示 -->
+      <!-- 金额 -->
       <span id="getScore">中奖金额<p>0</p ></span>
       <span id="allScore">当前余额<p>100</p ></span>
       <button id="change">充值￥100</button>
 
-      <!-- 隐藏但保留的原下注结构（顺序：苹果/橙子/柠檬/小铃铛/双星/双7/BAR） -->
+      <!-- 保留原下注结构（顺序：苹果/橙子/柠檬/小铃铛/双星/双7/BAR） -->
       <div class="stake">
         <div class="stake_left">
           <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
@@ -116,20 +121,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
           <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 底部一排（与盘面相隔一个按钮高，居中） -->
-  <div class="bottom-bar">
-    <button class="btn-icon" id="bet-apple">🍎<span class="badge" id="val-apple">0</span></button>
-    <button class="btn-icon" id="bet-orange">🍊<span class="badge" id="val-orange">0</span></button>
-    <button class="btn-icon" id="bet-lemon">🍋<span class="badge" id="val-lemon">0</span></button>
-    <button class="btn-icon" id="bet-bellS">🔔<span class="badge" id="val-bellS">0</span></button>
-    <button class="btn-icon" id="bet-watermelon">🍉<span class="badge" id="val-watermelon">0</span></button>
-    <button class="btn-icon btn-text" id="bet-stars">★★<span class="badge" id="val-stars">0</span></button>
-    <button class="btn-icon btn-text" id="bet-seven">77<span class="badge" id="val-seven">0</span></button>
-    <button class="btn-icon btn-text" id="bet-bar">BAR<span class="badge" id="val-bar">0</span></button>
-    <button class="btn-icon btn-text begin">开始</button>
+      <!-- ✅ 底部一排：正好在双7下面，隔 1 个图标高度；和盘面一样居中、同尺寸 -->
+      <div class="controlbar">
+        <button class="btn-icon" id="bet-apple">🍎<span class="badge" id="val-apple">0</span></button>
+        <button class="btn-icon" id="bet-orange">🍊<span class="badge" id="val-orange">0</span></button>
+        <button class="btn-icon" id="bet-lemon">🍋<span class="badge" id="val-lemon">0</span></button>
+        <button class="btn-icon" id="bet-bellS">🔔<span class="badge" id="val-bellS">0</span></button>
+        <button class="btn-icon" id="bet-watermelon">🍉<span class="badge" id="val-watermelon">0</span></button>
+        <button class="btn-icon btn-text" id="bet-stars">★★<span class="badge" id="val-stars">0</span></button>
+        <button class="btn-icon btn-text" id="bet-seven">77<span class="badge" id="val-seven">0</span></button>
+        <button class="btn-icon btn-text" id="bet-bar">BAR<span class="badge" id="val-bar">0</span></button>
+        <button class="btn-icon btn-text begin">开始</button>
+      </div>
+    </div>
   </div>
 
   <p class="note">此程序由奥特维Jerry开发</p >
@@ -137,7 +142,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
 
 <script>
 window.addEventListener('load', function () {
-  // 原有元素
+  /* ========= 声音：Web Audio API ========= */
+  let actx=null, tickTimer=null;
+  const ensureAudio=()=>{ if(!actx){ actx=new (window.AudioContext||window.webkitAudioContext)(); } };
+  function beep(freq=440, dur=80, vol=0.15){
+    ensureAudio(); const o=actx.createOscillator(), g=actx.createGain();
+    o.type='sine'; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(actx.destination);
+    const now=actx.currentTime; o.start(now); o.stop(now+dur/1000);
+  }
+  function clickSound(){ beep(520,60,0.18); }
+  function startTicks(){ if(tickTimer) return; tickTimer=setInterval(()=>beep(740,40,0.10),140); }
+  function stopTicks(){ if(tickTimer){ clearInterval(tickTimer); tickTimer=null; } }
+  function winSound(){ [660,880,990].forEach((f,i)=>setTimeout(()=>beep(f,90,0.2), i*110)); }
+
+  /* ========= 原有元素与变量 ========= */
   var begin=document.querySelector('.begin');
   var move=document.querySelector('#move');
   var getScore=document.querySelector('#getScore>p');
@@ -156,31 +175,34 @@ window.addEventListener('load', function () {
 
   var timer=null,time=null,flag=null,Score=100;
 
-  change.addEventListener('click',function(){ allScore.innerText = (Score+=100); });
+  change.addEventListener('click',function(){ allScore.innerText = (Score+=100); clickSound(); });
 
-  // 点图标下注：+1（到100回0），并扣 1 余额
+  // 点击下注：+1（到100回0），并扣余额 1
   icons.forEach((btn,i)=>{
     btn.addEventListener('click',function(){
       if(Score<=0){ alert('您的余额已不足，请充值后再下注'); return; }
-      var v=parseInt(pours[i].innerText||'0',10);
+      let v=parseInt(pours[i].innerText||'0',10);
       v = (v>=100) ? 0 : (v+1);
       pours[i].innerText=v; badges[i].innerText=v;
       Score--; allScore.innerText=Score;
+      clickSound();
     });
   });
 
-  // 开始：保持原逻辑与坐标
+  // 开始：保持原逻辑
   begin.addEventListener('click',function(){
     move.style.left='150px'; move.style.top='50px';
     clickMove(Score);
+    clickSound();
   });
 
-  // ======= 以下是你原来的逻辑（未改） =======
+  // ========= 以下为你原来的逻辑（不改） =========
   function clickMove(score){
     for(var i=0;i<pours.length;i++){ if(flag) break; decide_pour(pours[i]); }
     if(score===0){ alert('您的余额已不足，请充值后再开始！'); }
     else if(!flag){ alert('您未下注，请下注后再开始！'); }
     else{
+      stopTicks(); startTicks();                 // 开始转动音
       clearInterval(timer);
       var randNum=Math.ceil(Math.random()*200)*24;
       var scoreNum=Math.floor(randNum/20%24+1);
@@ -194,7 +216,7 @@ window.addEventListener('load', function () {
       begin.disabled=true;
       for(var i=0;i<add.length;i++){ add[i].disabled=true; minus[i].disabled=true; }
       time=setTimeout(function(){
-        clearInterval(timer);
+        clearInterval(timer); stopTicks();       // 停止转动音
         setTimeout(function(){
           var s=0;
           switch(scoreNum){
@@ -216,7 +238,7 @@ window.addEventListener('load', function () {
             case 3: s=reward(8)*25; break;
             case 4: s=reward(8)*50; break;
           }
-          getScore.innerText=s; sum(s);
+          getScore.innerText=s; sum(s); winSound();  // 停止时提示音
           for(var i=0;i<add.length;i++){
             add[i].previousElementSibling.innerText=0;
             if(badges[i]) badges[i].innerText='0';
