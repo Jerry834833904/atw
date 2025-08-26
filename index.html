@@ -1,259 +1,322 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Fruit</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f6fa;color:#111}
-#content{max-width:520px;margin:0 auto;padding:12px;text-align:center}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ATW串焊机4级解锁</title>
+  <style>
+    :root{
+      --bg:#f5f5f7; --ink:#111; --muted:#8e8e93; --card:#fff;
+      --border:#e5e5ea; --btnbg:#e9e9ec; --highlight:#16a34a;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font:17px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top) 16px 40px}
+    .topbar{width:100%;max-width:640px;display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+    .btn{
+      border:1px solid var(--border); border-radius:10px; background:var(--btnbg);
+      padding:8px 12px; cursor:pointer; font-size:15px;color:#007aff;
+    }
+    #luggageBtn{ composes: btn; }
+    .card{
+      width:100%; max-width:640px; background:var(--card); border:1px solid var(--border);
+      border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.06); padding:24px 20px; margin-top:12px;
+      text-align:center;
+    }
+    .title{font-weight:800; font-size:22px; margin:0 0 14px}
+    .input-row{margin:14px auto 10px; width:min(460px,100%)}
+    input[type="text"]{
+      width:100%; border:1px solid var(--border); border-radius:12px; padding:12px 14px; outline:none; font-size:16px;
+      background:#fff; text-align:center;
+    }
+    .btn-wide{
+      width:min(460px,100%); border:1px solid var(--border); border-radius:12px; background:var(--btnbg);
+      padding:14px 16px; cursor:pointer; font-size:16px; font-weight:700; margin:8px auto 0; display:block;color:#007aff;
+    }
+    .muted{color:var(--muted)}
+    .result{font-size:20px; font-weight:700; color:var(--highlight); min-height:1.6em; margin-top:14px}
+    .err{color:#e64d4d; min-height:1.2em; margin-top:8px}
+    .footer{max-width:720px; color:#e64d4d; font-size:13px; text-align:center; margin-top:18px}
 
-/* —— 用整体缩放适配手机：内部仍按你原来像素坐标 —— */
-.scale-wrap{width:1000px;height:1200px;margin:0 auto;transform-origin:top center;position:relative}
-@media (max-width:520px){
-  .scale-wrap{transform:scale(calc((100vw - 24px)/1000));
-              height:calc(1200px * ((100vw - 24px)/1000));}
-}
-
-/* —— 盘面（坐标/顺序/逻辑不变） —— */
-.box{width:1000px;height:1200px;background:#2b62ff;position:relative;border-radius:12px}
-.top{width:600px;height:100px;display:flex;position:absolute;top:50px;left:150px}
-.right{width:100px;height:600px;position:absolute;top:50px;right:150px;display:flex;flex-direction:column}
-.bottom{width:600px;height:100px;display:flex;flex-direction:row-reverse;position:absolute;top:650px;right:150px}
-.left{width:100px;height:600px;display:flex;flex-flow:column-reverse;position:absolute;top:150px;left:150px}
-
-/* 统一图标尺寸（盘面每格 98×98） */
-.cell{
-  width:98px;height:98px;border:1px solid #000;background:#fff;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:42px;user-select:none
-}
-.double{letter-spacing:1px}
-.lucky{font-size:32px} /* LUCKY 更小，完全在框内 */
-
-/* 移动高亮：黄色，不遮内容 */
-#move{
-  display:block;width:98px;height:98px;position:absolute;top:50px;left:150px;
-  border:3px solid #ffd400;outline:4px solid rgba(255,212,0,.35);
-  box-shadow:0 0 12px rgba(255,212,0,.5), inset 0 0 6px rgba(255,212,0,.3);
-  background:transparent;pointer-events:none
-}
-
-/* 金额信息（保留原 ID） */
-#getScore,#allScore{
-  display:block;width:200px;height:50px;font-size:24px;line-height:50px;color:#111;background:#fff;border-radius:8px;position:absolute;top:200px
-}
-#getScore{left:290px} #allScore{right:290px}
-#getScore>p,#allScore>p{display:inline-block;min-width:60px;font-weight:700;margin-left:8px}
-
-/* 充值按钮保留（原位） */
-#change{width:120px;height:36px;position:absolute;top:25px;right:15px;border-radius:8px;border:0;background:#111;color:#fff}
-
-/* —— 底部一排：放在盘面内部，精确定位在双7下面一个图标距离 —— */
-/* 双7这一排 bottom 的 top = 650，格高 = 98 → 底边 y = 748；再加一个格高 98 → 846 */
-.controlbar{
-  position:absolute; top:848px; left:50%; transform:translateX(-50%);
-  width:946px;  /* 9个按钮*98 + 8个间隔*8 = 882 + 64 = 946 */
-  display:flex;justify-content:center;gap:8px;
-}
-.btn-icon{
-  width:98px;height:98px;
-  display:flex;align-items:center;justify-content:center;
-  background:#fff;border:1px solid #000;border-radius:10px;
-  font-size:58px;font-weight:700;position:relative;user-select:none
-}
-.btn-icon:active{transform:scale(.97)}
-.btn-text{font-size:46px}
-.badge{
-  position:absolute;right:6px;bottom:6px;min-width:22px;height:20px;padding:0 4px;
-  background:#111;color:#fff;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700;
-}
-
-/* —— 隐藏但保留原下注结构（顺序不变，供原逻辑使用） —— */
-.stake{height:0;overflow:hidden}
-.stake .minus,.stake .add{display:none}
-.note{margin-top:6px;color:#666;font-size:12px}
-</style>
+    /* 相机区域 */
+    .camera-wrap{margin:10px auto 4px; width:min(460px,100%);}
+    video, canvas{width:100%; max-width:460px; border-radius:12px; border:1px solid var(--border);}
+    #preview{display:none; margin-top:8px;}
+    #canvas{display:none;}
+    .cam-row{display:flex; gap:8px; justify-content:center; margin-top:8px;}
+  </style>
 </head>
 <body>
-<div id="content">
-  <!-- 盘面：保持原像素/逻辑（整体缩放以适配手机） -->
-  <div class="scale-wrap">
-    <div class="box">
-      <div class="top">
-        <div class="cell">🍊</div><div class="cell">🔔</div><div class="cell">BAR</div>
-        <div class="cell">BAR</div><div class="cell">🍎</div><div class="cell">🍎</div>
-      </div>
-      <div class="right">
-        <div class="cell">🍋</div><div class="cell">🍉</div><div class="cell">🍉</div>
-        <div class="cell lucky">LUCKY</div><div class="cell">🍎</div><div class="cell">🍊</div>
-      </div>
-      <div class="bottom">
-        <div class="cell">🍊</div><div class="cell">🔔</div>
-        <div class="cell double">77</div><div class="cell double">77</div>
-        <div class="cell">🍎</div><div class="cell">🍋</div>
-      </div>
-      <div class="left">
-        <div class="cell">🍋</div><div class="cell double">★★</div><div class="cell double">★★</div>
-        <div class="cell lucky">LUCKY</div><div class="cell">🍎</div><div class="cell">🔔</div>
-      </div>
-
-      <!-- 高亮框（黄色描边/光晕，不遮内容） -->
-      <span id="move"></span>
-
-      <!-- 金额 -->
-      <span id="getScore">中奖金额<p>0</p ></span>
-      <span id="allScore">当前余额<p>100</p ></span>
-      <button id="change">充值￥100</button>
-
-      <!-- 保留原下注结构（顺序：苹果/橙子/柠檬/小铃铛/双星/双7/BAR） -->
-      <div class="stake">
-        <div class="stake_left">
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-        </div>
-        <div class="stake_right">
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-          <div><button class="minus">-</button><span>0</span><button class="add">+</button></div>
-        </div>
-      </div>
-
-      <!-- ✅ 底部一排：正好在双7下面，隔 1 个图标高度；和盘面一样居中、同尺寸 -->
-      <div class="controlbar">
-        <button class="btn-icon" id="bet-apple">🍎<span class="badge" id="val-apple">0</span></button>
-        <button class="btn-icon" id="bet-orange">🍊<span class="badge" id="val-orange">0</span></button>
-        <button class="btn-icon" id="bet-lemon">🍋<span class="badge" id="val-lemon">0</span></button>
-        <button class="btn-icon" id="bet-bellS">🔔<span class="badge" id="val-bellS">0</span></button>
-        <button class="btn-icon" id="bet-watermelon">🍉<span class="badge" id="val-watermelon">0</span></button>
-        <button class="btn-icon btn-text" id="bet-stars">★★<span class="badge" id="val-stars">0</span></button>
-        <button class="btn-icon btn-text" id="bet-seven">77<span class="badge" id="val-seven">0</span></button>
-        <button class="btn-icon btn-text" id="bet-bar">BAR<span class="badge" id="val-bar">0</span></button>
-        <button class="btn-icon btn-text begin">开始</button>
+  <div class="wrap">
+    <div class="topbar">
+      <div id="now" class="muted"></div>
+      <div>
+        <button id="ocrBtn" class="btn">📷 拍照识别</button>
+        <button id="luggageBtn" class="btn">🧳 Luggage</button>
       </div>
     </div>
-  </div>
 
-  <p class="note">此程序由奥特维Jerry开发</p >
+    <div class="card">
+      <h1 class="title" id="title">ATW串焊机4级解锁</h1>
+
+      <!-- 相机预览（点击“拍照识别”后显示） -->
+      <div class="camera-wrap" id="camWrap" hidden>
+        <video id="preview" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="cam-row">
+          <button id="snapBtn" class="btn">📸 识别此帧</button>
+          <button id="closeCamBtn" class="btn">✖ 关闭相机</button>
+        </div>
+        <div class="muted" style="font-size:13px; margin-top:6px;">
+          提示：对准黑底白字的 5 位序列号区域，尽量充满取景框并保持清晰。
+        </div>
 </div>
 
-<script>
-window.addEventListener('load', function () {
-  /* ========= 声音：Web Audio API ========= */
-  let actx=null, tickTimer=null;
-  const ensureAudio=()=>{ if(!actx){ actx=new (window.AudioContext||window.webkitAudioContext)(); } };
-  function beep(freq=440, dur=80, vol=0.15){
-    ensureAudio(); const o=actx.createOscillator(), g=actx.createGain();
-    o.type='sine'; o.frequency.value=freq; g.gain.value=vol;
-    o.connect(g); g.connect(actx.destination);
-    const now=actx.currentTime; o.start(now); o.stop(now+dur/1000);
-  }
-  function clickSound(){ beep(520,60,0.18); }
-  function startTicks(){ if(tickTimer) return; tickTimer=setInterval(()=>beep(740,40,0.10),140); }
-  function stopTicks(){ if(tickTimer){ clearInterval(tickTimer); tickTimer=null; } }
-  function winSound(){ [660,880,990].forEach((f,i)=>setTimeout(()=>beep(f,90,0.2), i*110)); }
+      <div class="input-row">
+        <input id="sn" type="text" inputmode="numeric" autocomplete="off" placeholder="请输入5位序列号" />
+      </div>
 
-  /* ========= 原有元素与变量 ========= */
-  var begin=document.querySelector('.begin');
-  var move=document.querySelector('#move');
-  var getScore=document.querySelector('#getScore>p');
-  var allScore=document.querySelector('#allScore>p');
-  var change=document.querySelector('#change');
+      <button id="genBtn" class="btn-wide">生成密码</button>
 
-  // 原下注结构（隐藏但保留）
-  var pours=document.querySelectorAll('.stake span');
-  var add=document.querySelectorAll('.stake .add');
-  var minus=document.querySelectorAll('.stake .minus');
+      <div id="err" class="err"></div>
+      <div id="res" class="result" data-raw-pwd=""></div>
+    </div>
 
-  // 新下注图标（顺序必须匹配 reward(1..8)）
-  var ids=['apple','orange','lemon','bellS','watermelon','stars','seven','bar'];
-  var icons=ids.map(id=>document.querySelector('#bet-'+id));
-  var badges=ids.map(id=>document.querySelector('#val-'+id));
+    <div id="foot" class="footer">此程序由奥特维王杰开发，请勿转发，如转发后果自负。</div>
+  </div>
 
-  var timer=null,time=null,flag=null,Score=100;
+  <!-- 浏览器端 OCR（WASM） -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-  change.addEventListener('click',function(){ allScore.innerText = (Score+=100); clickSound(); });
+  <script>
+    // ====== 后端域名 ======
+    const API_BASE = "https://atwjerry.834833904.workers.dev";
 
-  // 点击下注：+1（到100回0），并扣余额 1
-  icons.forEach((btn,i)=>{
-    btn.addEventListener('click',function(){
-      if(Score<=0){ alert('您的余额已不足，请充值后再下注'); return; }
-      let v=parseInt(pours[i].innerText||'0',10);
-      v = (v>=100) ? 0 : (v+1);
-      pours[i].innerText=v; badges[i].innerText=v;
-      Score--; allScore.innerText=Score;
-      clickSound();
-    });
-  });
+    // ====== 多语言文案 ======
+    const i18n = {
+      zh: {
+        title: "奥特维串焊机4级解锁",
+        placeholder: "请输入5位序列号",
+        gen: "生成密码",
+        resultPrefix: "密码是：",
+        errNaN: "序列号必须是5位数字",
+        errRange: "序列号范围为 00000 - 99999",
+        luggage: "🧳 Luggage",
+        ocrOpen: "📷 拍照识别",
+        ocrClose: "✖ 关闭相机",
+        ocrSnap: "📸 识别此帧",
+        tip: "提示：对准黑底白字的 5 位序列号区域，尽量充满取景框并保持清晰。",
+        footer: "此程序由奥特维王杰开发，请勿转发，如转发后果自负。"
+      },
+      en: {
+        title: "ATW Stringer L4 Unlock",
+        placeholder: "Enter 5-digit serial number",
+        gen: "Generate Password",
+        resultPrefix: "Password: ",
+        errNaN: "Serial number must be exactly 5 digits",
+        errRange: "Valid range: 00000 - 99999",
+        luggage: "🧳 Luggage",
+        ocrOpen: "📷 Scan via Camera",
+        ocrClose: "✖ Close Camera",
+        ocrSnap: "📸 Recognize Frame",
+        tip: "Tip: Aim at the 5-digit white-on-black serial area; fill the view and keep it sharp.",
+        footer: "Developed by ATW Jerry. Do not forward; you assume all consequences."
+      }
+    };
+    let lang = "zh";
 
-  // 开始：保持原逻辑
-  begin.addEventListener('click',function(){
-    move.style.left='150px'; move.style.top='50px';
-    clickMove(Score);
-    clickSound();
-  });
+    // ====== DOM ======
+    const nowEl = document.getElementById('now');
+    const title = document.getElementById('title');
+    const sn = document.getElementById('sn');
+    const genBtn = document.getElementById('genBtn');
+    const res = document.getElementById('res');
+    const err = document.getElementById('err');
+    const luggageBtn = document.getElementById('luggageBtn');
 
-  // ========= 以下为你原来的逻辑（不改） =========
-  function clickMove(score){
-    for(var i=0;i<pours.length;i++){ if(flag) break; decide_pour(pours[i]); }
-    if(score===0){ alert('您的余额已不足，请充值后再开始！'); }
-    else if(!flag){ alert('您未下注，请下注后再开始！'); }
-    else{
-      stopTicks(); startTicks();                 // 开始转动音
-      clearInterval(timer);
-      var randNum=Math.ceil(Math.random()*200)*24;
-      var scoreNum=Math.floor(randNum/20%24+1);
-      timer=setInterval(function(){
-        var L=move.offsetLeft,T=move.offsetTop;
-        if(T===50 && L<=650){ move.style.left=L+100+'px'; }
-        else if(L>=650 && T>=50 && T<=550){ move.style.top=T+100+'px'; }
-        else if(T>=650 && L<=750 && L>=250){ move.style.left=L-100+'px'; }
-        else if(L<=150 && T<=750 && T>50){ move.style.top=T-100+'px'; }
-      },20);
-      begin.disabled=true;
-      for(var i=0;i<add.length;i++){ add[i].disabled=true; minus[i].disabled=true; }
-      time=setTimeout(function(){
-        clearInterval(timer); stopTicks();       // 停止转动音
-        setTimeout(function(){
-          var s=0;
-          switch(scoreNum){
-            case 5:case 11:case 17:case 23: s=reward(1)*5; break;
-            case 6: s=reward(1)*10; break;
-            case 1:case 13: s=reward(2)*10; break;
-            case 12: s=reward(2)*20; break;
-            case 7:case 19: s=reward(3)*10; break;
-            case 18: s=reward(3)*20; break;
-            case 2:case 14: s=reward(4)*10; break;
-            case 24: s=reward(4)*20; break;
-            case 8: s=reward(5)*20; break;
-            case 9: s=reward(5)*40; break;
-            case 20: s=reward(6)*20; break;
-            case 21: s=reward(6)*40; break;
-            case 16: s=reward(7)*20; break;
-            case 15: s=reward(7)*40; break;
-            case 10:case 22: s=15; break;
-            case 3: s=reward(8)*25; break;
-            case 4: s=reward(8)*50; break;
-          }
-          getScore.innerText=s; sum(s); winSound();  // 停止时提示音
-          for(var i=0;i<add.length;i++){
-            add[i].previousElementSibling.innerText=0;
-            if(badges[i]) badges[i].innerText='0';
-            add[i].disabled=false; minus[i].disabled=false;
-          }
-          begin.disabled=false;
-        },500);
-        flag=false;
-      },randNum);
+    const ocrBtn = document.getElementById('ocrBtn');
+    const camWrap = document.getElementById('camWrap');
+    const preview = document.getElementById('preview');
+    const canvas = document.getElementById('canvas');
+    const snapBtn = document.getElementById('snapBtn');
+    const closeCamBtn = document.getElementById('closeCamBtn');
+
+{
+      const t = i18n[lang];
+      title.textContent = t.title;
+      sn.placeholder = t.placeholder;
+      genBtn.textContent = t.gen;
+      document.getElementById('foot').textContent = t.footer;
+      luggageBtn.textContent = t.luggage;
+      ocrBtn.textContent = t.ocrOpen;
+      snapBtn.textContent = t.ocrSnap;
+      closeCamBtn.textContent = t.ocrClose;
+      if (res.dataset.rawPwd) res.textContent = t.resultPrefix + res.dataset.rawPwd;
+      document.documentElement.lang = (lang === 'zh' ? 'zh-CN' : 'en');
+      // 相机提示文案
+      camWrap?.querySelector('.muted') && (camWrap.querySelector('.muted').textContent = t.tip);
     }
-  }
-  function decide_pour(obj){ var n=obj.innerText-0; flag=(n!==0); }
-  function reward(n){ return pours[n-1].innerText-0; }
-  function sum(score){ allScore.innerText=(parseInt(allScore.innerText,10)+score); Score=parseInt(allScore.innerText,10); }
-});
-</script>
+
+    // ===== 顶部时钟 =====
+function pad(n){ return String(n).padStart(2,'0'); }
+    function tickLocal() {
+      const d = new Date();
+      nowEl.textContent =
+        `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} `
+        + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    setInterval(tickLocal, 1000); tickLocal();
+
+    // ===== 相机控制 & OCR =====
+    let mediaStream = null;
+
+    async function openCamera(){
+      if (mediaStream) return; // 已打开
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' }, // 后置
+            width: { ideal: 1280 }, height: { ideal: 720 }
+          },
+          audio: false
+        });
+        preview.srcObject = mediaStream;
+        preview.style.display = 'block';
+        camWrap.hidden = false;
+      } catch (e) {
+        err.textContent = (lang === 'zh' ? '无法打开相机：' : 'Cannot open camera: ') + (e?.message || e);
+      }
+    }
+
+    function closeCamera(){
+      if (mediaStream){
+        mediaStream.getTracks().forEach(t=>t.stop());
+        mediaStream = null;
+      }
+      preview.srcObject = null;
+      preview.style.display = 'none';
+      camWrap.hidden = true;
+    }
+
+    async function snapAndOCR(){
+      if (!preview.videoWidth){ err.textContent = lang==='zh'?'相机未就绪':'Camera not ready'; return; }
+
+      // 把视频帧画到 canvas
+      const w = preview.videoWidth, h = preview.videoHeight;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(preview, 0, 0, w, h);
+
+      // 取中部 ROI（可按实际界面微调）
+      const roiW = Math.floor(w * 0.7);
+      const roiH = Math.floor(h * 0.20);
+      const roiX = Math.floor((w - roiW) / 2);
+      const roiY = Math.floor(h * 0.40);
+      const roi = ctx.getImageData(roiX, roiY, roiW, roiH);
+
+      // 放进临时 canvas 便于 OCR
+      const tmp = document.createElement('canvas');
+      tmp.width = roiW; tmp.height = roiH;
+      tmp.getContext('2d').putImageData(roi, 0, 0);
+
+      // 预处理：提高对比度（黑底白字场景）
+      const g = tmp.getContext('2d');
+      const img = g.getImageData(0,0,roiW,roiH);
+      const data = img.data;
+      for (let i=0;i<data.length;i+=4){
+        // 灰度
+        const gray = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+        // 简单阈值化
+        const v = gray > 160 ? 255 : 0;
+        data[i] = data[i+1] = data[i+2] = v;
+      }
+      g.putImageData(img,0,0);
+
+      err.textContent = lang==='zh'?'识别中…':'Recognizing…';
+      try{
+        const { data: { text } } = await Tesseract.recognize(
+          tmp.toDataURL(),
+          'eng',
+          {
+            // 白名单数字；相当于只认 0-9
+            tessedit_char_whitelist: '0123456789',
+            classify_bln_numeric_mode: 1,
+            preserve_interword_spaces: 0
+          }
+        );
+        const digits = (text || '').replace(/\D+/g,'').slice(0,5);
+        if (digits.length === 5){
+          sn.value = digits;
+          err.textContent = '';
+          // 自动调用你的计算逻辑
+          compute();
+        } else {
+          err.textContent = (lang==='zh'?'识别失败，请靠近/对准序列号区域重试。结果：':'Failed to recognize. Result: ') + (text||'').trim();
+        }
+      } catch(e){
+        err.textContent = (lang==='zh'?'OCR 出错：':'OCR error: ') + (e?.message || e);
+      }
+    }
+
+    // ===== 与后端对接保持不变：POST /api/calc =====
+ async function compute(){
+      err.textContent = '';
+      const t = i18n[lang];
+      const raw = (sn.value || '').trim();
+
+      if (!/^\d{5}$/.test(raw)){
+        err.textContent = t.errNaN;
+        res.textContent = '';
+        res.dataset.rawPwd = '';
+        return;
+      }
+
+      const n = Number(raw);
+      if (n < 0 || n > 99999){
+        err.textContent = t.errRange;
+        res.textContent = '';
+        res.dataset.rawPwd = '';
+        return;
+      }
+
+      try {
+        const clientEpochMs = Date.now();
+        const tzOffsetMin = new Date().getTimezoneOffset();
+        const r = await fetch(`${API_BASE}/api/calc`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sn: raw, clientEpochMs, tzOffsetMin })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.error || ("HTTP " + r.status));
+        res.dataset.rawPwd = data.pwd;
+        res.textContent = t.resultPrefix + data.pwd;
+      } catch (e) {
+        err.textContent = (lang === 'zh' ? "请求失败：" : "Request failed: ") + (e?.message || e);
+        res.dataset.rawPwd = '';
+        res.textContent = '';
+      }
+    }
+
+    // ===== 事件绑定 =====
+    genBtn.addEventListener('click', compute);
+    sn.addEventListener('keydown', e => { if (e.key === 'Enter') compute(); });
+    sn.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0,5); });
+
+    // 语言切换（复用你的行李按钮）
+    luggageBtn.addEventListener('click', () => { lang = (lang === 'zh' ? 'en' : 'zh'); applyI18n(); });
+
+    // 相机按钮
+    ocrBtn.addEventListener('click', openCamera);
+    snapBtn.addEventListener('click', snapAndOCR);
+    closeCamBtn.addEventListener('click', closeCamera);
+
+    // 初始
+    function applyI18n(){ /* 已在上面定义，此处保持引用一致 */ }
+    applyI18n();
+  </script>
 </body>
 </html>
