@@ -28,11 +28,13 @@
     /* 相机面板（可见视频框） */
     .cam-panel{ width:min(640px,100%); background:#fff; border:1px solid var(--border); border-radius:14px;
                 box-shadow:0 10px 30px rgba(0,0,0,.06); padding:12px; margin-top:12px; }
-    .cam-row{display:flex; gap:8px; justify-content:center; margin-top:8px;}
+    .cam-row{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:8px;}
     video, canvas{ width:100%; max-width:600px; border-radius:12px; border:1px solid var(--border); background:#000; }
     .note{font-size:13px; color:#666; margin-top:6px}
+    .live{font-size:16px; color:#222; text-align:center; margin:6px 0 0;}
+    .live b{font-variant-numeric: tabular-nums;}
 
-    /* 文件输入：移到屏外但可点击（iOS 允许 programmatic click） */
+    /* 选图输入移到屏外但可点击（iOS 允许 programmatic click） */
     #fileInput{ position:fixed; left:-9999px; top:0; width:1px; height:1px; opacity:0; pointer-events:auto; }
   </style>
 </head>
@@ -53,23 +55,25 @@
       <!-- 原有按钮 -->
       <button id="genBtn" class="btn-wide">生成密码</button>
 
-      <!-- 新增：拍照识别、语音识别 -->
-<button id="ocrBtn" class="btn-wide">📷 拍照识别</button>
+      <!-- 新增：拍照/语音 -->
+      <button id="ocrBtn" class="btn-wide">📷 拍照识别</button>
       <button id="voiceBtn" class="btn-wide">🎤 语音识别</button>
 
       <div id="err" class="err"></div>
       <div id="res" class="result" data-raw-pwd=""></div>
     </div>
 
-    <!-- 可见相机面板（视频框架一定出现） -->
-    <div id="camPanel" class="cam-panel" hidden>
+    <!-- 相机面板 -->
+<div id="camPanel" class="cam-panel" hidden>
       <div class="muted" id="camTitle">相机预览（若黑屏，请确保 HTTPS / 允许相机权限 / 非无痕模式）</div>
       <video id="preview" playsinline autoplay muted></video>
       <canvas id="frame" hidden></canvas>
+      <div class="live">实时识别：<b id="liveNum">—</b></div>
       <div class="cam-row">
-        <button id="startCam" class="btn-wide" style="max-width:220px;">启动相机</button>
-        <button id="snap" class="btn-wide" style="max-width:220px;">识别此帧</button>
-        <button id="closeCam" class="btn-wide" style="max-width:220px;">关闭相机</button>
+        <button id="startAuto" class="btn-wide" style="max-width:210px;">启动相机（自动）</button>
+        <button id="snap" class="btn-wide" style="max-width:210px;">识别此帧</button>
+        <button id="pickImg" class="btn-wide" style="max-width:210px;">选择图片识别</button>
+        <button id="closeCam" class="btn-wide" style="max-width:210px;">关闭相机</button>
       </div>
       <div class="note">提示：相机不可用时会自动切换为“拍照/选图”。</div>
     </div>
@@ -77,14 +81,11 @@
     <div id="foot" class="footer">此程序由奥特维王杰开发，请勿转发，如转发后果自负。</div>
   </div>
 
-  <!-- 降级拍照用的文件输入 -->
   <input id="fileInput" type="file" accept="image/*" capture="environment" />
-
-  <!-- 浏览器端 OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
-    /* ===== 基础配置 / 文案 ===== */
+    /* ================= 基础文案与界面 ================= */
     const API_BASE = "https://atwjerry.834833904.workers.dev";
     const i18n = {
       zh:{ title:"奥特维串焊机4级解锁", placeholder:"请输入5位序列号",
@@ -93,31 +94,27 @@
            errRange:"序列号范围为 00000 - 99999",
            errOCR:"识别失败，请靠近/对准序列号区域重试。",
            errCam:"相机不可用：", errASRNo:"此浏览器不支持语音识别",
-           errASR:"语音识别错误：", tipListening:"正在听…请说5位数字（可中文或英文）",
+           errASR:"语音识别错误：", tipListening:"正在听…请说5位数字（中文）",
            luggage:"🧳 Luggage", footer:"此程序由奥特维王杰开发，请勿转发，如转发后果自负。",
-           camTitle:"相机预览（若黑屏，请确保 HTTPS / 允许权限 / 非无痕）",
-           startCam:"启动相机", snap:"识别此帧", closeCam:"关闭相机" },
+           camTitle:"相机预览（若黑屏，请确保 HTTPS / 允许权限 / 非无痕）" },
       en:{ title:"ATW Stringer L4 Unlock", placeholder:"Enter 5-digit serial number",
            gen:"Generate Password", ocr:"📷 Scan via Camera", voice:"🎤 Speech Input",
            resultPrefix:"Password: ", errNaN:"Serial number must be exactly 5 digits",
            errRange:"Valid range: 00000 - 99999",
            errOCR:"Recognition failed. Try moving closer or adjust the angle.",
            errCam:"Camera error: ", errASRNo:"Speech recognition is not supported in this browser",
-           errASR:"Speech recognition error: ", tipListening:"Listening… please say five digits (Chinese or English).",
+           errASR:"Speech recognition error: ", tipListening:"Listening… please say five digits (English)",
            luggage:"🧳 Luggage", footer:"Developed by ATW Jerry. Do not forward; you assume all consequences.",
-           camTitle:"Camera preview (If black, ensure HTTPS / permission / not private mode)",
-           startCam:"Start Camera", snap:"Recognize Frame", closeCam:"Close Camera" }
+           camTitle:"Camera preview (If black, ensure HTTPS / permission / not private mode)" }
     };
     let lang="zh";
-/* ===== 顶部时钟 ===== */
+
     const nowEl=document.getElementById('now');
     function pad(n){return String(n).padStart(2,'0');}
     setInterval(()=>{ const d=new Date();
       nowEl.textContent=`${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     },1000);
-
-    /* ===== DOM ===== */
-    const titleEl=document.getElementById('title');
+const titleEl=document.getElementById('title');
     const sn=document.getElementById('sn');
     const genBtn=document.getElementById('genBtn');
     const ocrBtn=document.getElementById('ocrBtn');
@@ -131,29 +128,25 @@
     const camTitle=document.getElementById('camTitle');
     const preview=document.getElementById('preview');
     const frame=document.getElementById('frame');
-    const startCam=document.getElementById('startCam');
+    const startAuto=document.getElementById('startAuto');
     const snap=document.getElementById('snap');
     const closeCam=document.getElementById('closeCam');
+    const pickImg=document.getElementById('pickImg');
     const fileInput=document.getElementById('fileInput');
+    const liveNum=document.getElementById('liveNum');
 
     function applyI18n(){
       const t=i18n[lang];
-      titleEl.textContent=t.title;
-      sn.placeholder=t.placeholder;
-      genBtn.textContent=t.gen;
-      ocrBtn.textContent=t.ocr;
-      voiceBtn.textContent=t.voice;
-      foot.textContent=t.footer;
-      luggageBtn.textContent=t.luggage;
-      camTitle.textContent=t.camTitle;
-      startCam.textContent=t.startCam;
-      snap.textContent=t.snap;
-      closeCam.textContent=t.closeCam;
+      titleEl.textContent=t.title; sn.placeholder=t.placeholder;
+      genBtn.textContent=t.gen; ocrBtn.textContent=t.ocr; voiceBtn.textContent=t.voice;
+      luggageBtn.textContent=t.luggage; foot.textContent=t.footer; camTitle.textContent=t.camTitle;
       if(res.dataset.rawPwd) res.textContent=t.resultPrefix+res.dataset.rawPwd;
       document.documentElement.lang=(lang==='zh'?'zh-CN':'en');
+      // 更新语音提示文字
+      liveNum.textContent='—';
     }
 
-    /* ===== 与后端对接（不变） ===== */
+    /* ================= 业务：计算密码 ================= */
     async function compute(){
       err.textContent=''; const t=i18n[lang];
       const raw=(sn.value||'').trim();
@@ -170,105 +163,216 @@
       }catch(e){ err.textContent=(lang==='zh'?'请求失败：':'Request failed: ')+(e?.message||e); res.dataset.rawPwd=''; res.textContent=''; }
     }
 
-    /* ===== 输入限制 & 事件 ===== */
-sn.addEventListener('input', e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,5); });
+    sn.addEventListener('input', e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,5); });
     genBtn.addEventListener('click', compute);
     sn.addEventListener('keydown', e=>{ if(e.key==='Enter') compute(); });
     luggageBtn.addEventListener('click', ()=>{ lang=(lang==='zh'?'en':'zh'); applyI18n(); });
 
-    /* ===== OCR 预处理 & 投票 ===== */
-    function cropROI(ctx, rx=0.15, ry=0.38, rw=0.70, rh=0.22){
-      const W=ctx.canvas.width, H=ctx.canvas.height;
-      const x=Math.floor(W*rx), y=Math.floor(H*ry);
-      const cw=Math.floor(W*rw), ch=Math.floor(H*rh);
-      const roi=ctx.getImageData(x,y,cw,ch);
-      const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
-      cv.getContext('2d').putImageData(roi,0,0); return cv;
+    /* ================= 图像：自动寻带 + 预处理 + 投票 ================= */
+    function toGray(r,g,b){ return 0.299*r + 0.587*g + 0.114*b; }
+
+    function findDarkBand(ctx){
+      const {width:w, height:h} = ctx.canvas;
+      const rowStep = Math.max(1, Math.floor(h/200));
+      const bandH   = Math.max(12, Math.floor(h * 0.10));
+      const id = ctx.getImageData(0,0,w,h).data;
+      let bestY = 0, bestScore = -1e9;
+      // 既看“黑”(均值小)，也看“对比度”(局部方差大)
+for (let y=0; y<h-bandH; y+=rowStep){
+        let m=0,cnt=0; let s2=0;
+        for (let yy=y; yy<y+bandH; yy+=rowStep){
+          for (let x=0; x<w; x+=4){
+            const j=(yy*w + x)*4;
+            const g=toGray(id[j],id[j+1],id[j+2]);
+            m+=g; s2+=g*g; cnt++;
+          }
+        }
+        m/=cnt; const varv = s2/cnt - m*m; // 方差
+        const score = -m + Math.sqrt(Math.max(0,varv)); // 黑且有对比
+        if (score > bestScore){ bestScore = score; bestY = y; }
+      }
+      const x = Math.floor(w * 0.10);
+      const cw = Math.floor(w * 0.80);
+      const y = Math.max(0, Math.min(h-bandH, bestY - Math.floor(bandH*0.15)));
+      const ch = Math.min(h - y, Math.floor(bandH * 1.35));
+      const roi = ctx.getImageData(x,y,cw,ch);
+      const cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      cv.getContext('2d').putImageData(roi,0,0);
+      return cv;
     }
-    function boxBlur(ctx, radius=1){
-      const {width,height}=ctx.canvas; const id=ctx.getImageData(0,0,width,height);
-      const src=id.data, out=new Uint8ClampedArray(src.length);
-      for(let y=0;y<height;y++){ for(let x=0;x<width;x++){
-        let rs=0,gs=0,bs=0,cnt=0;
-        for(let dy=-radius;dy<=radius;dy++){ const yy=y+dy; if(yy<0||yy>=height) continue;
-          for(let dx=-radius;dx<=radius;dx++){ const xx=x+dx; if(xx<0||xx>=width) continue;
-            const i=(yy*width+xx)*4; rs+=src[i]; gs+=src[i+1]; bs+=src[i+2]; cnt++; } }
-        const o=(y*width+x)*4; out[o]=rs/cnt; out[o+1]=gs/cnt; out[o+2]=bs/cnt; out[o+3]=255;
-      }}
+
+    function boxBlur(ctx, r=1){
+      const {width, height} = ctx.canvas;
+      const id = ctx.getImageData(0,0,width,height);
+      const src = id.data, out = new Uint8ClampedArray(src.length);
+      for(let y=0;y<height;y++){
+        for(let x=0;x<width;x++){
+          let rs=0,gs=0,bs=0,cnt=0;
+          for(let dy=-r;dy<=r;dy++){
+            const yy=y+dy; if(yy<0||yy>=height) continue;
+            for(let dx=-r;dx<=r;dx++){
+              const xx=x+dx; if(xx<0||xx>=width) continue;
+              const i=(yy*width+xx)*4; rs+=src[i]; gs+=src[i+1]; bs+=src[i+2]; cnt++;
+            }
+          }
+          const o=(y*width+x)*4; out[o]=rs/cnt; out[o+1]=gs/cnt; out[o+2]=bs/cnt; out[o+3]=255;
+        }
+      }
       id.data.set(out); ctx.putImageData(id,0,0);
     }
-    function binarize(ctx, threshold=160, invert=false){
-      const {width,height}=ctx.canvas; const id=ctx.getImageData(0,0,width,height); const d=id.data;
-      for(let i=0;i<d.length;i+=4){ const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const v=(g>threshold)?255:0; const px=invert?255-v:v;
-        d[i]=d[i+1]=d[i+2]=px; d[i+3]=255; } ctx.putImageData(id,0,0);
-    }
-    function unsharp(ctx, amount=0.6){
-      const {width,height}=ctx.canvas; const base=ctx.getImageData(0,0,width,height);
-      const blurCv=document.createElement('canvas'); blurCv.width=width; blurCv.height=height;
-      const bctx=blurCv.getContext('2d'); bctx.putImageData(base,0,0); boxBlur(bctx,1);
-      const blur=bctx.getImageData(0,0,width,height).data; const src=base.data;
-      for(let i=0;i<src.length;i+=4){
-        src[i]=Math.min(255,Math.max(0,src[i]+(src[i]-blur[i])*amount));
-        src[i+1]=Math.min(255,Math.max(0,src[i+1]+(src[i+1]-blur[i+1])*amount));
-        src[i+2]=Math.min(255,Math.max(0,src[i+2]+(src[i+2]-blur[i+2])*amount));
+
+    function unsharp(ctx, k=0.8){
+      const {width, height} = ctx.canvas;
+      const base = ctx.getImageData(0,0,width,height);
+      const blurC = document.createElement('canvas'); blurC.width=width; blurC.height=height;
+      const b = blurC.getContext('2d'); b.putImageData(base,0,0); boxBlur(b,1);
+      const blur = b.getImageData(0,0,width,height).data; const d=base.data;
+      for(let i=0;i<d.length;i+=4){
+        d[i]=Math.min(255,Math.max(0,d[i]+(d[i]-blur[i])*k));
+        d[i+1]=Math.min(255,Math.max(0,d[i+1]+(d[i+1]-blur[i+1])*k));
+        d[i+2]=Math.min(255,Math.max(0,d[i+2]+(d[i+2]-blur[i+2])*k));
       } ctx.putImageData(base,0,0);
     }
-    function upscale(srcCanvas, scale=2){
-      const o=document.createElement('canvas'); o.width=Math.round(srcCanvas.width*scale); o.height=Math.round(srcCanvas.height*scale);
-      const c=o.getContext('2d'); c.imageSmoothingEnabled=true; c.drawImage(srcCanvas,0,0,o.width,o.height); return o;
+
+    function binarize(ctx, th=165, invert=false){
+      const {width, height} = ctx.canvas;
+      const id=ctx.getImageData(0,0,width,height), d=id.data;
+      for(let i=0;i<d.length;i+=4){
+        const g=toGray(d[i],d[i+1],d[i+2]);
+        const v=g>th?255:0; const p=invert?255-v:v;
+        d[i]=d[i+1]=d[i+2]=p; d[i+3]=255;
+      } ctx.putImageData(id,0,0);
     }
+
+    function upscale(cv, s=2){
+      const o=document.createElement('canvas'); o.width=Math.round(cv.width*s); o.height=Math.round(cv.height*s);
+      const c=o.getContext('2d'); c.imageSmoothingEnabled=false; // 保留硬边缘
+      c.drawImage(cv,0,0,o.width,o.height); return o;
+    }
+
+    // 自适应阈值：基于 ROI 均值/方差生成一组阈值
+function genThresholds(cv){
+      const ctx=cv.getContext('2d'); const {width:w,height:h}=cv;
+      const d=ctx.getImageData(0,0,w,h).data;
+      let m=0,s2=0,c=0;
+      for(let i=0;i<d.length;i+=4){ const g=toGray(d[i],d[i+1],d[i+2]); m+=g; s2+=g*g; c++; }
+      m/=c; const sd=Math.sqrt(Math.max(0, s2/c - m*m));
+      const arr=[m+0.2*sd, m+0.35*sd, m+0.5*sd, 150, 170, 190]
+        .map(x=>Math.max(110, Math.min(210, Math.round(x))));
+      return Array.from(new Set(arr)); // 去重
+    }
+
     async function ocrVariants(cv){
-      const variants=[]; const scales=[1.6,2.0,3.0]; const thresholds=[140,160,180]; const inverts=[false,true];
+      const variants=[];
+      const scales=[1.8,2.4,3.2];
+      const thresholds=genThresholds(cv);
+      const inverts=[false,true];
+      const psms=[7,8];
       for(const sc of scales){
-        const up=upscale(cv,sc); const c=up.getContext('2d'); unsharp(c,0.6);
-        for(const th of thresholds){ for(const inv of inverts){
+        const up=upscale(cv,sc); const c=up.getContext('2d'); unsharp(c,0.8);
+        for(const th of thresholds){ for(const inv of inverts){ for(const psm of psms){
           const test=document.createElement('canvas'); test.width=up.width; test.height=up.height;
           const tc=test.getContext('2d'); tc.drawImage(up,0,0); binarize(tc,th,inv);
           const {data:{text}}=await Tesseract.recognize(test.toDataURL(),'eng',
-            { tessedit_char_whitelist:'0123456789', tessedit_pageseg_mode:7, classify_bln_numeric_mode:1 });
-          const d=(text||'').replace(/\D+/g,'').slice(0,5); if(d) variants.push(d);
-        }}
+            { tessedit_char_whitelist:'0123456789', tessedit_pageseg_mode:psm, classify_bln_numeric_mode:1 });
+          const d=(text||'').replace(/\D+/g,'').slice(0,5);
+          if(d){ variants.push(d); liveNum.textContent=d; } // 实时显示候选
+        }}}
       }
       const count={}; for(const v of variants){ count[v]=(count[v]||0)+1; }
-      let best='',score=-1; Object.keys(count).forEach(k=>{ const s=count[k]+(k.length===5?2:0); if(s>score){score=s;best=k;} });
+      let best='',score=-1; Object.keys(count).forEach(k=>{ const s=count[k]+(k.length===5?3:0); if(s>score){score=s;best=k;} });
       return best.slice(0,5);
     }
 
-    /* ===== 相机控制（视频预览 + 降级拍照） ===== */
-let mediaStream=null;
+    /* ================= 相机：自动循环 + 手动帧 + 选图识别 ================= */
+    let mediaStream=null, autoTimer=null, autoTries=0, ocrBusy=false;
+
     function canUseGUM(){
       return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) &&
              (window.isSecureContext || location.hostname==='localhost');
     }
+
     async function startCamera(){
-      const t=i18n[lang]; err.textContent='';
-      if(!canUseGUM()){ err.textContent=t.errCam+"非 HTTPS 或浏览器不支持，将使用拍照/选图方式"; return; }
+      if(!canUseGUM()){ err.textContent=i18n[lang].errCam+"非 HTTPS 或浏览器不支持，将使用选图方式"; return false; }
       try{
         mediaStream=await navigator.mediaDevices.getUserMedia({
           video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false
         });
         preview.srcObject=mediaStream;
-        await new Promise(res=>{
-          if(preview.readyState>=2) res();
-          else preview.onloadedmetadata=res;
-        });
+        await new Promise(res=>{ if(preview.readyState>=2) res(); else preview.onloadedmetadata=res; });
         await preview.play().catch(()=>{});
+        return true;
       }catch(e){
-        err.textContent=t.errCam+(e?.message||e)+"；将使用拍照/选图方式。";
+        err.textContent=i18n[lang].errCam+(e?.message||e)+"；请改用“选择图片识别”。";
+        return false;
       }
     }
+
     function stopCamera(){
       if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
       preview.srcObject=null;
+      if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+      ocrBusy=false; autoTries=0; liveNum.textContent='—';
     }
-    async function captureAndOCRFromVideo(){
-      if(!(preview.videoWidth>0)){ err.textContent=i18n[lang].errCam+"相机未就绪"; return; }
-      frame.width=preview.videoWidth; frame.height=preview.videoHeight;
-      const ctx=frame.getContext('2d',{willReadFrequently:true});
-      ctx.drawImage(preview,0,0,frame.width,frame.height);
-      await doOCROnDataURL(frame.toDataURL('image/jpeg',0.92));
+
+    async function captureAndOCRFromVideoOnce(){
+      if(!(preview.videoWidth>0)) return null;
+      // 防并发
+      if(ocrBusy) return null;
+      ocrBusy = true;
+      try{
+        frame.width=preview.videoWidth; frame.height=preview.videoHeight;
+        const ctx=frame.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(preview,0,0,frame.width,frame.height);
+
+        // 连拍三帧投票
+const take=()=>{ const cvs=document.createElement('canvas'); cvs.width=frame.width; cvs.height=frame.height;
+          cvs.getContext('2d',{willReadFrequently:true}).drawImage(preview,0,0,cvs.width,cvs.height); return cvs; };
+        const frames=[take(),take(),take()];
+        const votes=[];
+        for(const f of frames){
+          const c=f.getContext('2d',{willReadFrequently:true});
+          const roi=findDarkBand(c);
+          const d=await ocrVariants(roi);
+          if(d) votes.push(d);
+        }
+        const tally={}; votes.forEach(v=>tally[v]=(tally[v]||0)+1);
+        let best='',score=-1; Object.keys(tally).forEach(k=>{ const s=tally[k]+(k.length===5?2:0); if(s>score){score=s;best=k;} });
+        return best || null;
+      } finally {
+        ocrBusy = false;
+      }
     }
-    async function captureAndOCRByFile(){
+
+    async function startAutoLoop(){
+      const ok = await startCamera();
+      if(!ok) return;
+      err.textContent='';
+      autoTries=0;
+      autoTimer=setInterval(async ()=>{
+        autoTries++;
+        const best = await captureAndOCRFromVideoOnce();
+        if(best && best.length===5){
+          sn.value=best; err.textContent=''; stopCamera(); camPanel.hidden=true; await compute();
+        }else if(autoTries>=25){ // 最多试 25 次
+          err.textContent=i18n[lang].errOCR+"（自动识别超时，可手动点“识别此帧”或“选择图片识别”）";
+          clearInterval(autoTimer); autoTimer=null;
+        }
+      }, 800);
+    }
+
+    async function captureManual(){
+      if(mediaStream) {
+        const best = await captureAndOCRFromVideoOnce();
+        if(best && best.length===5){ sn.value=best; await compute(); }
+        else err.textContent=i18n[lang].errOCR;
+      } else {
+        await pickImageAndOCR();
+      }
+    }
+
+    async function pickImageAndOCR(){
       fileInput.value=''; fileInput.click();
       const imgURL=await new Promise(resolve=>{
         fileInput.onchange=()=>{
@@ -277,67 +381,62 @@ let mediaStream=null;
           } else resolve(null);
         };
       });
-      if(imgURL) await doOCROnDataURL(imgURL);
-      else err.textContent=i18n[lang].errCam+'未选择图片';
-    }
-    async function doOCROnDataURL(url){
-      const t=i18n[lang];
-      const img=new Image(); img.src=url; await img.decode();
+      if(!imgURL){ err.textContent=i18n[lang].errCam+'未选择图片'; return; }
+      const img=new Image(); img.src=imgURL; await img.decode();
       const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
       const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0);
-      const roiCanvas=cropROI(cx);
-      const digits=await ocrVariants(roiCanvas);
+      const roi=findDarkBand(cx);
+      const digits=await ocrVariants(roi);
       if(digits && digits.length===5){ sn.value=digits; await compute(); }
-      else err.textContent=t.errOCR;
+      else err.textContent=i18n[lang].errOCR;
     }
 
-    // 展示面板并（尽量）直接启动相机（保证视频框出现）
-ocrBtn.addEventListener('click', ()=>{ camPanel.hidden=false; startCamera(); });
-    startCam.addEventListener('click', startCamera);
-    snap.addEventListener('click', async ()=>{
-      if(mediaStream) await captureAndOCRFromVideo();
-      else await captureAndOCRByFile();
-    });
+    // 面板与按钮
+ocrBtn.addEventListener('click', ()=>{ camPanel.hidden=false; });
+    startAuto.addEventListener('click', startAutoLoop);
+    snap.addEventListener('click', captureManual);
+    pickImg.addEventListener('click', pickImageAndOCR);
     closeCam.addEventListener('click', ()=>{ stopCamera(); camPanel.hidden=true; });
 
-    /* ===== 语音识别：中文 + 英文词到数字 ===== */
+    /* ================= 语音（按页面语言各自识别） ================= */
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     function mapChineseDigitsToArabic(txt){
-      const map={'零':'0','〇':'0','○':'0','Ｏ':'0','O':'0','o':'0','０':'0',
+      const map={'零':'0','〇':'0','○':'0','Ｏ':'0','０':'0',
                  '一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9'};
-      return txt.replace(/[零〇○ＯOo０一二三四五六七八九]/g, ch => map[ch] || ch);
+      return txt.replace(/[零〇○Ｏ０一二三四五六七八九]/g, ch => map[ch] || ch);
     }
     function mapEnglishDigitsToArabic(txt){
-      // 处理 oh/zero/one/two/.../nine，含常见同音和误识别
       const words=[['zero','oh','o','owe'],['one'],['two','to','too'],['three'],['four','for'],['five'],
                    ['six'],['seven'],['eight','ate'],['nine']];
       let s=' '+txt.toLowerCase().replace(/[-,._]/g,' ')+' ';
       words.forEach((alts,d)=>alts.forEach(w=>{ s=s.replace(new RegExp('\\b'+w+'\\b','g'),' '+d+' ');} ));
       return s.replace(/\s+/g,' ');
     }
+
     voiceBtn.addEventListener('click', ()=>{
       const t=i18n[lang]; err.textContent='';
       if(!SpeechRec){ err.textContent=t.errASRNo; return; }
-      const tryRec = (code)=> new Promise((resolve,reject)=>{
-        const rec=new SpeechRec(); rec.lang=code; rec.interimResults=false; rec.maxAlternatives=1;
-        let done=false; rec.onresult=(ev)=>{done=true; resolve(ev.results[0][0].transcript||'');};
-        rec.onerror=(e)=>{ if(!done) reject(e); }; rec.onend=()=>{ if(!done) resolve(''); };
-        try{ rec.start(); }catch(e){ reject(e); }
-      });
-      (async ()=>{
-        err.textContent=t.tipListening;
-        let txt=''; try{ txt=await tryRec(lang==='zh'?'zh-CN':'en-US'); }catch(_){}
-        if(!txt){ try{ txt=await tryRec(lang==='zh'?'en-US':'zh-CN'); }catch(_){} }
-        if(!txt){ err.textContent=t.errASR; return; }
-        let norm=mapChineseDigitsToArabic(txt);
-        norm=mapEnglishDigitsToArabic(norm);
-        const digits=norm.replace(/\D+/g,'').slice(0,5);
-        if(digits.length===5){ sn.value=digits; err.textContent=''; await compute(); }
-        else err.textContent=t.errNaN+'（'+txt+'）';
-      })();
+      const rec=new SpeechRec();
+      rec.interimResults=false; rec.maxAlternatives=1;
+      // 只按当前页面语言识别
+      if(lang==='zh'){ rec.lang='zh-CN'; } else { rec.lang='en-US'; }
+      try{ rec.start(); }catch(_){}
+      err.textContent=t.tipListening;
+
+      rec.onresult = async (ev)=>{
+        let txt = ev.results[0][0].transcript || '';
+        let norm = txt;
+        if(lang==='zh'){ norm = mapChineseDigitsToArabic(norm); }
+        else { norm = mapEnglishDigitsToArabic(norm); }
+        const digits = norm.replace(/\D+/g,'').slice(0,5);
+        if(digits.length===5){ sn.value = digits; err.textContent=''; await compute(); }
+        else{ err.textContent = t.errNaN + '（' + txt + '）'; }
+      };
+      rec.onerror = (e)=>{ err.textContent = t.errASR + (e?.error || e); };
     });
 
-    /* ===== 初始化 ===== */
+    /* ================= 启动 ================= */
     applyI18n();
   </script>
 </body>
