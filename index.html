@@ -36,6 +36,8 @@
     .result{font-size:20px; font-weight:700; color:var(--highlight); min-height:1.6em; margin-top:14px}
     .err{color:#e64d4d; min-height:1.2em; margin-top:8px}
     .footer{max-width:720px; color:#e64d4d; font-size:13px; text-align:center; margin-top:18px}
+    /* 隐形文件输入（相机失败时降级拍照） */
+    #fileInput{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;}
   </style>
 </head>
 <body>
@@ -55,7 +57,7 @@
       <!-- 原有按钮 -->
       <button id="genBtn" class="btn-wide">生成密码</button>
 
-      <!-- 新增：拍照识别、语音识别（不影响原有布局与功能） -->
+      <!-- 新增：拍照识别、语音识别 -->
       <button id="ocrBtn" class="btn-wide">📷 拍照识别</button>
       <button id="voiceBtn" class="btn-wide">🎤 语音识别</button>
 
@@ -66,13 +68,17 @@
     <div id="foot" class="footer">此程序由奥特维王杰开发，请勿转发，如转发后果自负。</div>
   </div>
 
+  <!-- 降级拍照用的文件输入 -->
+<input id="fileInput" type="file" accept="image/*" capture="environment" />
+
   <!-- 浏览器端 OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
     // ====== 后端域名 ======
     const API_BASE = "https://atwjerry.834833904.workers.dev";
-// ====== 多语言文案 ======
+
+    // ====== 多语言文案 ======
     const i18n = {
       zh: {
         title: "奥特维串焊机4级解锁",
@@ -87,7 +93,7 @@
         errCam: "相机不可用：",
         errASRNo: "此浏览器不支持语音识别",
         errASR: "语音识别错误：",
-        tipListening: "正在听…请说5位数字",
+        tipListening: "正在听…请说5位数字（可中文或英文）",
         luggage: "🧳 Luggage",
         footer: "此程序由奥特维王杰开发，请勿转发，如转发后果自负。"
       },
@@ -104,7 +110,7 @@
         errCam: "Camera error: ",
         errASRNo: "Speech recognition is not supported in this browser",
         errASR: "Speech recognition error: ",
-        tipListening: "Listening… please say five digits",
+        tipListening: "Listening… please say five digits (Chinese or English).",
         luggage: "🧳 Luggage",
         footer: "Developed by ATW Jerry. Do not forward; you assume all consequences."
       }
@@ -132,7 +138,9 @@
     const foot = document.getElementById('foot');
     const err = document.getElementById('err');
     const res = document.getElementById('res');
-function applyI18n() {
+    const fileInput = document.getElementById('fileInput');
+
+    function applyI18n() {
       const t = i18n[lang];
       titleEl.textContent = t.title;
       sn.placeholder = t.placeholder;
@@ -146,7 +154,7 @@ function applyI18n() {
     }
 
     // ===== 与后端对接（不变） =====
-    async function compute(){
+async function compute(){
       err.textContent = '';
       const t = i18n[lang];
       const raw = (sn.value || '').trim();
@@ -189,195 +197,241 @@ function applyI18n() {
     sn.addEventListener('keydown', e => { if (e.key === 'Enter') compute(); });
     luggageBtn.addEventListener('click', () => { lang = (lang === 'zh' ? 'en' : 'zh'); applyI18n(); });
 
-    // ===== 拍照识别（更稳版本：ROI + 多阈值/反相 + 多尺度 + 锐化 + 投票） =====
+    // ===== 工具函数：OCR 预处理与识别 =====
+    function cropROI(ctx, rx=0.15, ry=0.38, rw=0.70, rh=0.22){
+      const W = ctx.canvas.width, H = ctx.canvas.height;
+      const x = Math.floor(W*rx), y = Math.floor(H*ry);
+      const cw = Math.floor(W*rw), ch = Math.floor(H*rh);
+      const roi = ctx.getImageData(x,y,cw,ch);
+      const cv = document.createElement('canvas');
+      cv.width=cw; cv.height=ch;
+      cv.getContext('2d').putImageData(roi,0,0);
+      return cv;
+    }
+    function boxBlur(ctx, radius=1){
+      const {width, height} = ctx.canvas;
+      const id = ctx.getImageData(0,0,width,height);
+      const src = id.data, out = new Uint8ClampedArray(src.length);
+      for(let y=0;y<height;y++){
+        for(let x=0;x<width;x++){
+          let rs=0,gs=0,bs=0,cnt=0;
+          for(let dy=-radius;dy<=radius;dy++){
+            const yy=y+dy; if(yy<0||yy>=height) continue;
+            for(let dx=-radius;dx<=radius;dx++){
+              const xx=x+dx; if(xx<0||xx>=width) continue;
+              const i=(yy*width+xx)*4;
+              rs+=src[i]; gs+=src[i+1]; bs+=src[i+2]; cnt++;
+            }
+          }
+          const o=(y*width+x)*4;
+          out[o]=rs/cnt; out[o+1]=gs/cnt; out[o+2]=bs/cnt; out[o+3]=255;
+        }
+      }
+      id.data.set(out); ctx.putImageData(id,0,0);
+    }
+    function binarize(ctx, threshold=160, invert=false){
+      const {width, height} = ctx.canvas;
+      const id = ctx.getImageData(0,0,width,height);
+      const d = id.data;
+      for(let i=0;i<d.length;i+=4){
+        const g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+        const v = (g>threshold)?255:0;
+        const px = invert ? 255-v : v;
+        d[i]=d[i+1]=d[i+2]=px; d[i+3]=255;
+}
+      ctx.putImageData(id,0,0);
+    }
+    function unsharp(ctx, amount=0.6){
+      const {width, height} = ctx.canvas;
+      const base = ctx.getImageData(0,0,width,height);
+      const blurCv = document.createElement('canvas');
+      blurCv.width=width; blurCv.height=height;
+      const bctx = blurCv.getContext('2d');
+      bctx.putImageData(base,0,0);
+      boxBlur(bctx, 1);
+      const blur = bctx.getImageData(0,0,width,height).data;
+      const src = base.data;
+      for(let i=0;i<src.length;i+=4){
+        src[i]   = Math.min(255, Math.max(0, src[i]   + (src[i]-blur[i])  * amount));
+        src[i+1] = Math.min(255, Math.max(0, src[i+1] + (src[i+1]-blur[i+1])* amount));
+        src[i+2] = Math.min(255, Math.max(0, src[i+2] + (src[i+2]-blur[i+2])* amount));
+      }
+      ctx.putImageData(base,0,0);
+    }
+    function upscale(srcCanvas, scale=2){
+      const o=document.createElement('canvas');
+      o.width=Math.round(srcCanvas.width*scale);
+      o.height=Math.round(srcCanvas.height*scale);
+      const c=o.getContext('2d');
+      c.imageSmoothingEnabled=true;
+      c.drawImage(srcCanvas,0,0,o.width,o.height);
+      return o;
+    }
+    async function ocrVariants(cv){
+      const variants=[];
+      const scales=[1.6, 2.0, 3.0];
+      const thresholds=[140, 160, 180];
+      const inverts=[false, true];
+
+      for(const sc of scales){
+        const up = upscale(cv, sc);
+        const c = up.getContext('2d');
+        unsharp(c, 0.6);
+        for(const th of thresholds){
+          for(const inv of inverts){
+            const test = document.createElement('canvas');
+            test.width=up.width; test.height=up.height;
+            const tc = test.getContext('2d');
+            tc.drawImage(up,0,0);
+            binarize(tc, th, inv);
+            const { data:{ text } } = await Tesseract.recognize(
+              test.toDataURL(), 'eng',
+              {
+                tessedit_char_whitelist:'0123456789',
+                tessedit_pageseg_mode: 7,
+                classify_bln_numeric_mode: 1
+              }
+            );
+            const d = (text||'').replace(/\D+/g,'').slice(0,5);
+            if (d) variants.push(d);
+}
+        }
+      }
+      const count = {};
+      for(const v of variants){ count[v]=(count[v]||0)+1; }
+      let best='', score=-1;
+      Object.keys(count).forEach(k=>{
+        const s = count[k] + (k.length===5?2:0);
+        if(s>score){ score=s; best=k; }
+      });
+      return best.slice(0,5);
+    }
+
+    // ===== 相机识别（带降级） =====
     ocrBtn.addEventListener('click', async ()=>{
       const t = i18n[lang];
-      try{
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video:{ facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:720} }
-        });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        await video.play();
-
-        // 抓一帧
-        const w = video.videoWidth, h = video.videoHeight;
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(video, 0, 0, w, h);
-
-        // 关相机
-        stream.getTracks().forEach(t=>t.stop());
-
-        // 裁剪 ROI（屏幕中部黑底白字区域；可微调比例）
-        function cropROI(srcCtx, rx=0.15, ry=0.38, rw=0.70, rh=0.22){
-          const W = srcCtx.canvas.width, H = srcCtx.canvas.height;
-          const x = Math.floor(W*rx), y = Math.floor(H*ry);
-          const cw = Math.floor(W*rw), ch = Math.floor(H*rh);
-          const roi = srcCtx.getImageData(x,y,cw,ch);
-          const cv = document.createElement('canvas');
-          cv.width=cw; cv.height=ch;
-          cv.getContext('2d').putImageData(roi,0,0);
-          return cv;
-        }
-
-        // 简单盒式模糊
-function boxBlur(ctx, radius=1){
-          const {width, height} = ctx.canvas;
-          const id = ctx.getImageData(0,0,width,height);
-          const src = id.data;
-          const out = new Uint8ClampedArray(src.length);
-          for(let y=0;y<height;y++){
-            for(let x=0;x<width;x++){
-              let rs=0,gs=0,bs=0,cnt=0;
-              for(let dy=-radius;dy<=radius;dy++){
-                const yy=y+dy; if(yy<0||yy>=height) continue;
-                for(let dx=-radius;dx<=radius;dx++){
-                  const xx=x+dx; if(xx<0||xx>=width) continue;
-                  const i=(yy*width+xx)*4;
-                  rs+=src[i]; gs+=src[i+1]; bs+=src[i+2]; cnt++;
-                }
-              }
-              const o=(y*width+x)*4;
-              out[o]=rs/cnt; out[o+1]=gs/cnt; out[o+2]=bs/cnt; out[o+3]=255;
-            }
-          }
-          id.data.set(out); ctx.putImageData(id,0,0);
-        }
-
-        // 灰度二值化
-        function binarize(ctx, threshold=160, invert=false){
-          const {width, height} = ctx.canvas;
-          const id = ctx.getImageData(0,0,width,height);
-          const d = id.data;
-          for(let i=0;i<d.length;i+=4){
-            const g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-            const v = (g>threshold)?255:0;
-            const px = invert ? 255-v : v;
-            d[i]=d[i+1]=d[i+2]=px; d[i+3]=255;
-          }
-          ctx.putImageData(id,0,0);
-        }
-
-        // 轻微锐化
-        function unsharp(ctx, amount=0.6){
-          const {width, height} = ctx.canvas;
-          const base = ctx.getImageData(0,0,width,height);
-          const blurCv = document.createElement('canvas');
-          blurCv.width=width; blurCv.height=height;
-          const bctx = blurCv.getContext('2d');
-          bctx.putImageData(base,0,0);
-          boxBlur(bctx, 1);
-          const blur = bctx.getImageData(0,0,width,height).data;
-          const src = base.data;
-          for(let i=0;i<src.length;i+=4){
-            src[i]   = Math.min(255, Math.max(0, src[i]   + (src[i]-blur[i])  * amount));
-            src[i+1] = Math.min(255, Math.max(0, src[i+1] + (src[i+1]-blur[i+1])* amount));
-            src[i+2] = Math.min(255, Math.max(0, src[i+2] + (src[i+2]-blur[i+2])* amount));
-          }
-          ctx.putImageData(base,0,0);
-        }
-
-        // 放大
-        function upscale(srcCanvas, scale=2){
-          const o=document.createElement('canvas');
-          o.width=Math.round(srcCanvas.width*scale);
-          o.height=Math.round(srcCanvas.height*scale);
-          const c=o.getContext('2d');
-          c.imageSmoothingEnabled=true;
-          c.drawImage(srcCanvas,0,0,o.width,o.height);
-          return o;
-        }
-
-        // 多策略 OCR 并投票
-async function tryRecognize(cv){
-          const variants=[];
-          const scales=[1.6, 2.0, 3.0];
-          const thresholds=[140, 160, 180];
-          const inverts=[false, true];
-
-          for(const sc of scales){
-            const up = upscale(cv, sc);
-            const c = up.getContext('2d');
-            unsharp(c, 0.6);
-            for(const th of thresholds){
-              for(const inv of inverts){
-                const test = document.createElement('canvas');
-                test.width=up.width; test.height=up.height;
-                const tc = test.getContext('2d');
-                tc.drawImage(up,0,0);
-                binarize(tc, th, inv);
-                const { data:{ text } } = await Tesseract.recognize(
-                  test.toDataURL(), 'eng',
-                  {
-                    tessedit_char_whitelist:'0123456789',
-                    tessedit_pageseg_mode: 7,
-                    classify_bln_numeric_mode: 1
-                  }
-                );
-                const d = (text||'').replace(/\D+/g,'').slice(0,5);
-                if (d) variants.push(d);
-              }
-            }
-          }
-          // 投票
-          const count = {};
-          for(const v of variants){ count[v]=(count[v]||0)+1; }
-          let best='', score=-1;
-          Object.keys(count).forEach(k=>{
-            const s = count[k] + (k.length===5?2:0);
-            if(s>score){ score=s; best=k; }
+      err.textContent='';
+      // 优先：getUserMedia
+      let snapshotURL = null;
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (isSecureContext || location.hostname==='localhost')) {
+        try{
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video:{ facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:720} },
+            audio:false
           });
-          return best.slice(0,5);
+          const video = document.createElement('video');
+          video.setAttribute('playsinline','true');
+          video.muted = true;
+          video.srcObject = stream;
+          await video.play();
+          const w = video.videoWidth, h = video.videoHeight;
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently:true });
+          ctx.drawImage(video, 0, 0, w, h);
+          stream.getTracks().forEach(t=>t.stop());
+          snapshotURL = canvas.toDataURL();
+        }catch(e){
+          // 忽略，走降级
         }
+      }
+      // 降级：调用文件输入拍照/选图
+      if(!snapshotURL){
+        fileInput.value = "";
+        fileInput.click();
+        const imgURL = await new Promise(resolve=>{
+          fileInput.onchange = ()=>{
+            if(fileInput.files && fileInput.files[0]){
+              const fr = new FileReader();
+              fr.onload = ()=> resolve(fr.result);
+              fr.readAsDataURL(fileInput.files[0]);
+            } else resolve(null);
+          };
+        });
+        snapshotURL = imgURL;
+      }
+      if(!snapshotURL){ err.textContent = i18n[lang].errCam + "无可用相机或未选择图片"; return; }
 
-        const roiCanvas = cropROI(ctx);
-        const digits = await tryRecognize(roiCanvas);
-
-        if(digits && digits.length===5){
-          sn.value = digits;
-          err.textContent = '';
-          await compute(); // 自动计算
-        }else{
-          err.textContent = t.errOCR;
-        }
-      }catch(e){
-        err.textContent = i18n[lang].errCam + (e?.message || e);
+      // OCR 处理
+      const img = new Image();
+      img.src = snapshotURL;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const cx = c.getContext('2d', { willReadFrequently:true });
+      cx.drawImage(img,0,0);
+      const roiCanvas = cropROI(cx);
+      const digits = await ocrVariants(roiCanvas);
+      if(digits && digits.length===5){
+sn.value = digits;
+        await compute();
+      }else{
+        err.textContent = t.errOCR;
       }
     });
 
-    // ===== 语音识别（Web Speech API） =====
+    // ===== 语音识别：支持中文 & 英文数字 =====
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     function mapChineseDigitsToArabic(txt){
       const map = {'零':'0','〇':'0','○':'0','Ｏ':'0','O':'0','o':'0','０':'0',
                    '一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9'};
       return txt.replace(/[零〇○ＯOo０一二三四五六七八九]/g, ch => map[ch] || ch);
     }
+    function mapEnglishDigitsToArabic(txt){
+      // 处理 "zero/oh/o", "one", "two", ..., 支持连读连写、连字符
+      const words = [
+        ['zero','oh','o','owe','o.','o,'], ['one'], ['two','to','too'], ['three'], ['four','for'], ['five'],
+        ['six'], ['seven'], ['eight','ate'], ['nine']
+      ];
+      let s = ' ' + txt.toLowerCase().replace(/[-,._]/g,' ') + ' ';
+      // 逐个数字词替换
+      words.forEach((alts, d)=>{
+        alts.forEach(w=>{
+          const re = new RegExp('\\b'+w+'\\b','g');
+          s = s.replace(re, ' '+d+' ');
+        });
+      });
+      return s.replace(/\s+/g,' ');
+    }
 
     voiceBtn.addEventListener('click', ()=>{
       const t = i18n[lang];
+      err.textContent = '';
       if(!SpeechRec){ err.textContent = t.errASRNo; return; }
-      const rec = new SpeechRec();
-      rec.lang = (lang==='zh' ? 'zh-CN' : 'en-US');
-      rec.interimResults = false;
-      rec.maxAlternatives = 1;
-      try{ rec.start(); }catch(_){}
-      err.textContent = t.tipListening;
+      // 先按当前 UI 语言启动；若不成，再用另一种语言兜底
+      const tryRecognize = (langCode)=> new Promise((resolve,reject)=>{
+        const rec = new SpeechRec();
+        rec.lang = langCode;
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        let done=false;
+        rec.onresult = (ev)=>{ done=true; resolve(ev.results[0][0].transcript || ''); };
+        rec.onerror  = (e)=>{ if(!done) reject(e); };
+        rec.onend    = ()=>{ if(!done) resolve(''); };
+        try{ rec.start(); }catch(e){ reject(e); }
+      });
 
-      rec.onresult = async (ev)=>{
-        let txt = ev.results[0][0].transcript || '';
-        txt = mapChineseDigitsToArabic(txt);
-        const digits = txt.replace(/\D+/g,'').slice(0,5);
-        if(digits.length === 5){
+      (async ()=>{
+        err.textContent = t.tipListening;
+        let txt = '';
+        try { txt = await tryRecognize(lang==='zh' ? 'zh-CN' : 'en-US'); } catch(_){}
+        if(!txt){ try { txt = await tryRecognize(lang==='zh' ? 'en-US' : 'zh-CN'); } catch(_){ } }
+        if(!txt){ err.textContent = t.errASR; return; }
+
+        // 中文&英文双通道归一
+        let norm = mapChineseDigitsToArabic(txt);
+        norm = mapEnglishDigitsToArabic(norm);
+        const digits = norm.replace(/\D+/g,'').slice(0,5);
+
+        if(digits.length===5){
           sn.value = digits;
           err.textContent = '';
-          await compute(); // 自动计算
+          await compute();
         }else{
           err.textContent = t.errNaN + '（' + txt + '）';
         }
-      };
-      rec.onerror = (e)=>{ err.textContent = t.errASR + (e?.error || e); };
+      })();
     });
 
     // ===== 初始化 =====
