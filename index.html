@@ -5,39 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ATW串焊机4级解锁</title>
   <style>
-    :root{
-      --bg:#f5f5f7; --ink:#111; --muted:#8e8e93; --card:#fff;
-      --border:#e5e5ea; --btnbg:#e9e9ec; --highlight:#16a34a;
-    }
+    :root{ --bg:#f5f5f7; --ink:#111; --muted:#8e8e93; --card:#fff;
+           --border:#e5e5ea; --btnbg:#e9e9ec; --highlight:#16a34a; }
     html,body{height:100%;}
-    body{
-      margin:0; background:var(--bg); color:var(--ink);
-      font:17px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
-    }
+    body{ margin:0; background:var(--bg); color:var(--ink);
+          font:17px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; }
     .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top) 16px 40px}
     .topbar{width:100%;max-width:640px;display:flex;justify-content:space-between;align-items:center;margin-top:8px}
     #luggageBtn{border:1px solid var(--border); border-radius:10px; background:var(--btnbg); padding:8px 12px; cursor:pointer; font-size:15px;color:#007aff;}
-    .card{
-      width:100%; max-width:640px; background:var(--card); border:1px solid var(--border);
-      border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.06); padding:24px 20px; margin-top:12px;
-      text-align:center;
-    }
+    .card{ width:100%; max-width:640px; background:var(--card); border:1px solid var(--border);
+           border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.06); padding:24px 20px; margin-top:12px; text-align:center; }
     .title{font-weight:800; font-size:22px; margin:0 0 14px}
     .input-row{margin:14px auto 10px; width:min(460px,100%)}
-    input[type="text"]{
-      width:100%; border:1px solid var(--border); border-radius:12px; padding:12px 14px; outline:none; font-size:16px;
-      background:#fff; text-align:center;
-    }
-    .btn-wide{
-      width:min(460px,100%); border:1px solid var(--border); border-radius:12px; background:var(--btnbg);
-      padding:14px 16px; cursor:pointer; font-size:16px; font-weight:700; margin:8px auto 0; display:block;color:#007aff;
-    }
+    input[type="text"]{ width:100%; border:1px solid var(--border); border-radius:12px; padding:12px 14px; outline:none; font-size:16px; background:#fff; text-align:center; }
+    .btn-wide{ width:min(460px,100%); border:1px solid var(--border); border-radius:12px; background:var(--btnbg);
+               padding:14px 16px; cursor:pointer; font-size:16px; font-weight:700; margin:8px auto 0; display:block;color:#007aff; }
     .muted{color:var(--muted)}
     .result{font-size:20px; font-weight:700; color:var(--highlight); min-height:1.6em; margin-top:14px}
     .err{color:#e64d4d; min-height:1.2em; margin-top:8px}
     .footer{max-width:720px; color:#e64d4d; font-size:13px; text-align:center; margin-top:18px}
-    /* 隐形文件输入（相机失败时降级拍照） */
-    #fileInput{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;}
+
+    /* 相机面板（可见视频框） */
+    .cam-panel{ width:min(640px,100%); background:#fff; border:1px solid var(--border); border-radius:14px;
+                box-shadow:0 10px 30px rgba(0,0,0,.06); padding:12px; margin-top:12px; }
+    .cam-row{display:flex; gap:8px; justify-content:center; margin-top:8px;}
+    video, canvas{ width:100%; max-width:600px; border-radius:12px; border:1px solid var(--border); background:#000; }
+    .note{font-size:13px; color:#666; margin-top:6px}
+
+    /* 文件输入：移到屏外但可点击（iOS 允许 programmatic click） */
+    #fileInput{ position:fixed; left:-9999px; top:0; width:1px; height:1px; opacity:0; pointer-events:auto; }
   </style>
 </head>
 <body>
@@ -58,383 +54,290 @@
       <button id="genBtn" class="btn-wide">生成密码</button>
 
       <!-- 新增：拍照识别、语音识别 -->
-      <button id="ocrBtn" class="btn-wide">📷 拍照识别</button>
+<button id="ocrBtn" class="btn-wide">📷 拍照识别</button>
       <button id="voiceBtn" class="btn-wide">🎤 语音识别</button>
 
       <div id="err" class="err"></div>
       <div id="res" class="result" data-raw-pwd=""></div>
     </div>
 
+    <!-- 可见相机面板（视频框架一定出现） -->
+    <div id="camPanel" class="cam-panel" hidden>
+      <div class="muted" id="camTitle">相机预览（若黑屏，请确保 HTTPS / 允许相机权限 / 非无痕模式）</div>
+      <video id="preview" playsinline autoplay muted></video>
+      <canvas id="frame" hidden></canvas>
+      <div class="cam-row">
+        <button id="startCam" class="btn-wide" style="max-width:220px;">启动相机</button>
+        <button id="snap" class="btn-wide" style="max-width:220px;">识别此帧</button>
+        <button id="closeCam" class="btn-wide" style="max-width:220px;">关闭相机</button>
+      </div>
+      <div class="note">提示：相机不可用时会自动切换为“拍照/选图”。</div>
+    </div>
+
     <div id="foot" class="footer">此程序由奥特维王杰开发，请勿转发，如转发后果自负。</div>
   </div>
 
   <!-- 降级拍照用的文件输入 -->
-<input id="fileInput" type="file" accept="image/*" capture="environment" />
+  <input id="fileInput" type="file" accept="image/*" capture="environment" />
 
   <!-- 浏览器端 OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
-    // ====== 后端域名 ======
+    /* ===== 基础配置 / 文案 ===== */
     const API_BASE = "https://atwjerry.834833904.workers.dev";
-
-    // ====== 多语言文案 ======
     const i18n = {
-      zh: {
-        title: "奥特维串焊机4级解锁",
-        placeholder: "请输入5位序列号",
-        gen: "生成密码",
-        ocr: "📷 拍照识别",
-        voice: "🎤 语音识别",
-        resultPrefix: "密码是：",
-        errNaN: "序列号必须是5位数字",
-        errRange: "序列号范围为 00000 - 99999",
-        errOCR: "识别失败，请靠近/对准序列号区域重试。",
-        errCam: "相机不可用：",
-        errASRNo: "此浏览器不支持语音识别",
-        errASR: "语音识别错误：",
-        tipListening: "正在听…请说5位数字（可中文或英文）",
-        luggage: "🧳 Luggage",
-        footer: "此程序由奥特维王杰开发，请勿转发，如转发后果自负。"
-      },
-      en: {
-        title: "ATW Stringer L4 Unlock",
-        placeholder: "Enter 5-digit serial number",
-        gen: "Generate Password",
-        ocr: "📷 Scan via Camera",
-        voice: "🎤 Speech Input",
-        resultPrefix: "Password: ",
-        errNaN: "Serial number must be exactly 5 digits",
-        errRange: "Valid range: 00000 - 99999",
-        errOCR: "Recognition failed. Try moving closer or adjust the angle.",
-        errCam: "Camera error: ",
-        errASRNo: "Speech recognition is not supported in this browser",
-        errASR: "Speech recognition error: ",
-        tipListening: "Listening… please say five digits (Chinese or English).",
-        luggage: "🧳 Luggage",
-        footer: "Developed by ATW Jerry. Do not forward; you assume all consequences."
-      }
+      zh:{ title:"奥特维串焊机4级解锁", placeholder:"请输入5位序列号",
+           gen:"生成密码", ocr:"📷 拍照识别", voice:"🎤 语音识别",
+           resultPrefix:"密码是：", errNaN:"序列号必须是5位数字",
+           errRange:"序列号范围为 00000 - 99999",
+           errOCR:"识别失败，请靠近/对准序列号区域重试。",
+           errCam:"相机不可用：", errASRNo:"此浏览器不支持语音识别",
+           errASR:"语音识别错误：", tipListening:"正在听…请说5位数字（可中文或英文）",
+           luggage:"🧳 Luggage", footer:"此程序由奥特维王杰开发，请勿转发，如转发后果自负。",
+           camTitle:"相机预览（若黑屏，请确保 HTTPS / 允许权限 / 非无痕）",
+           startCam:"启动相机", snap:"识别此帧", closeCam:"关闭相机" },
+      en:{ title:"ATW Stringer L4 Unlock", placeholder:"Enter 5-digit serial number",
+           gen:"Generate Password", ocr:"📷 Scan via Camera", voice:"🎤 Speech Input",
+           resultPrefix:"Password: ", errNaN:"Serial number must be exactly 5 digits",
+           errRange:"Valid range: 00000 - 99999",
+           errOCR:"Recognition failed. Try moving closer or adjust the angle.",
+           errCam:"Camera error: ", errASRNo:"Speech recognition is not supported in this browser",
+           errASR:"Speech recognition error: ", tipListening:"Listening… please say five digits (Chinese or English).",
+           luggage:"🧳 Luggage", footer:"Developed by ATW Jerry. Do not forward; you assume all consequences.",
+           camTitle:"Camera preview (If black, ensure HTTPS / permission / not private mode)",
+           startCam:"Start Camera", snap:"Recognize Frame", closeCam:"Close Camera" }
     };
-    let lang = "zh";
+    let lang="zh";
+/* ===== 顶部时钟 ===== */
+    const nowEl=document.getElementById('now');
+    function pad(n){return String(n).padStart(2,'0');}
+    setInterval(()=>{ const d=new Date();
+      nowEl.textContent=`${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    },1000);
 
-    // ===== 顶部时钟 =====
-    const nowEl = document.getElementById('now');
-    function pad(n){ return String(n).padStart(2,'0'); }
-    function tickLocal() {
-      const d = new Date();
-      nowEl.textContent =
-        `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} `
-        + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    /* ===== DOM ===== */
+    const titleEl=document.getElementById('title');
+    const sn=document.getElementById('sn');
+    const genBtn=document.getElementById('genBtn');
+    const ocrBtn=document.getElementById('ocrBtn');
+    const voiceBtn=document.getElementById('voiceBtn');
+    const luggageBtn=document.getElementById('luggageBtn');
+    const foot=document.getElementById('foot');
+    const err=document.getElementById('err');
+    const res=document.getElementById('res');
+
+    const camPanel=document.getElementById('camPanel');
+    const camTitle=document.getElementById('camTitle');
+    const preview=document.getElementById('preview');
+    const frame=document.getElementById('frame');
+    const startCam=document.getElementById('startCam');
+    const snap=document.getElementById('snap');
+    const closeCam=document.getElementById('closeCam');
+    const fileInput=document.getElementById('fileInput');
+
+    function applyI18n(){
+      const t=i18n[lang];
+      titleEl.textContent=t.title;
+      sn.placeholder=t.placeholder;
+      genBtn.textContent=t.gen;
+      ocrBtn.textContent=t.ocr;
+      voiceBtn.textContent=t.voice;
+      foot.textContent=t.footer;
+      luggageBtn.textContent=t.luggage;
+      camTitle.textContent=t.camTitle;
+      startCam.textContent=t.startCam;
+      snap.textContent=t.snap;
+      closeCam.textContent=t.closeCam;
+      if(res.dataset.rawPwd) res.textContent=t.resultPrefix+res.dataset.rawPwd;
+      document.documentElement.lang=(lang==='zh'?'zh-CN':'en');
     }
-    setInterval(tickLocal, 1000); tickLocal();
 
-    // ===== DOM =====
-    const titleEl = document.getElementById('title');
-    const sn = document.getElementById('sn');
-    const genBtn = document.getElementById('genBtn');
-    const ocrBtn = document.getElementById('ocrBtn');
-    const voiceBtn = document.getElementById('voiceBtn');
-    const luggageBtn = document.getElementById('luggageBtn');
-    const foot = document.getElementById('foot');
-    const err = document.getElementById('err');
-    const res = document.getElementById('res');
-    const fileInput = document.getElementById('fileInput');
-
-    function applyI18n() {
-      const t = i18n[lang];
-      titleEl.textContent = t.title;
-      sn.placeholder = t.placeholder;
-      genBtn.textContent = t.gen;
-      ocrBtn.textContent = t.ocr;
-      voiceBtn.textContent = t.voice;
-      foot.textContent = t.footer;
-      luggageBtn.textContent = t.luggage;
-      if (res.dataset.rawPwd) res.textContent = t.resultPrefix + res.dataset.rawPwd;
-      document.documentElement.lang = (lang === 'zh' ? 'zh-CN' : 'en');
-    }
-
-    // ===== 与后端对接（不变） =====
-async function compute(){
-      err.textContent = '';
-      const t = i18n[lang];
-      const raw = (sn.value || '').trim();
-
-      if (!/^\d{5}$/.test(raw)){
-        err.textContent = t.errNaN;
-        res.textContent = '';
-        res.dataset.rawPwd = '';
-        return;
-      }
-      const n = Number(raw);
-      if (n < 0 || n > 99999){
-        err.textContent = t.errRange;
-        res.textContent = '';
-        res.dataset.rawPwd = '';
-        return;
-      }
-      try {
-        const clientEpochMs = Date.now();
-        const tzOffsetMin = new Date().getTimezoneOffset();
-        const r = await fetch(`${API_BASE}/api/calc`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sn: raw, clientEpochMs, tzOffsetMin })
+    /* ===== 与后端对接（不变） ===== */
+    async function compute(){
+      err.textContent=''; const t=i18n[lang];
+      const raw=(sn.value||'').trim();
+      if(!/^\d{5}$/.test(raw)){ err.textContent=t.errNaN; res.textContent=''; res.dataset.rawPwd=''; return; }
+      const n=Number(raw);
+      if(n<0||n>99999){ err.textContent=t.errRange; res.textContent=''; res.dataset.rawPwd=''; return; }
+      try{
+        const r=await fetch(`${API_BASE}/api/calc`,{
+          method:"POST", headers:{"content-type":"application/json"},
+          body:JSON.stringify({ sn:raw, clientEpochMs:Date.now(), tzOffsetMin:new Date().getTimezoneOffset() })
         });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error || ("HTTP " + r.status));
-        res.dataset.rawPwd = data.pwd;
-        res.textContent = t.resultPrefix + data.pwd;
-      } catch (e) {
-        err.textContent = (lang === 'zh' ? "请求失败：" : "Request failed: ") + (e?.message || e);
-        res.dataset.rawPwd = '';
-        res.textContent = '';
-      }
+        const data=await r.json(); if(!r.ok) throw new Error(data?.error||("HTTP "+r.status));
+        res.dataset.rawPwd=data.pwd; res.textContent=t.resultPrefix+data.pwd;
+      }catch(e){ err.textContent=(lang==='zh'?'请求失败：':'Request failed: ')+(e?.message||e); res.dataset.rawPwd=''; res.textContent=''; }
     }
 
-    // ===== 输入限制 & 事件 =====
-    sn.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0,5); });
+    /* ===== 输入限制 & 事件 ===== */
+sn.addEventListener('input', e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,5); });
     genBtn.addEventListener('click', compute);
-    sn.addEventListener('keydown', e => { if (e.key === 'Enter') compute(); });
-    luggageBtn.addEventListener('click', () => { lang = (lang === 'zh' ? 'en' : 'zh'); applyI18n(); });
+    sn.addEventListener('keydown', e=>{ if(e.key==='Enter') compute(); });
+    luggageBtn.addEventListener('click', ()=>{ lang=(lang==='zh'?'en':'zh'); applyI18n(); });
 
-    // ===== 工具函数：OCR 预处理与识别 =====
+    /* ===== OCR 预处理 & 投票 ===== */
     function cropROI(ctx, rx=0.15, ry=0.38, rw=0.70, rh=0.22){
-      const W = ctx.canvas.width, H = ctx.canvas.height;
-      const x = Math.floor(W*rx), y = Math.floor(H*ry);
-      const cw = Math.floor(W*rw), ch = Math.floor(H*rh);
-      const roi = ctx.getImageData(x,y,cw,ch);
-      const cv = document.createElement('canvas');
-      cv.width=cw; cv.height=ch;
-      cv.getContext('2d').putImageData(roi,0,0);
-      return cv;
+      const W=ctx.canvas.width, H=ctx.canvas.height;
+      const x=Math.floor(W*rx), y=Math.floor(H*ry);
+      const cw=Math.floor(W*rw), ch=Math.floor(H*rh);
+      const roi=ctx.getImageData(x,y,cw,ch);
+      const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+      cv.getContext('2d').putImageData(roi,0,0); return cv;
     }
     function boxBlur(ctx, radius=1){
-      const {width, height} = ctx.canvas;
-      const id = ctx.getImageData(0,0,width,height);
-      const src = id.data, out = new Uint8ClampedArray(src.length);
-      for(let y=0;y<height;y++){
-        for(let x=0;x<width;x++){
-          let rs=0,gs=0,bs=0,cnt=0;
-          for(let dy=-radius;dy<=radius;dy++){
-            const yy=y+dy; if(yy<0||yy>=height) continue;
-            for(let dx=-radius;dx<=radius;dx++){
-              const xx=x+dx; if(xx<0||xx>=width) continue;
-              const i=(yy*width+xx)*4;
-              rs+=src[i]; gs+=src[i+1]; bs+=src[i+2]; cnt++;
-            }
-          }
-          const o=(y*width+x)*4;
-          out[o]=rs/cnt; out[o+1]=gs/cnt; out[o+2]=bs/cnt; out[o+3]=255;
-        }
-      }
+      const {width,height}=ctx.canvas; const id=ctx.getImageData(0,0,width,height);
+      const src=id.data, out=new Uint8ClampedArray(src.length);
+      for(let y=0;y<height;y++){ for(let x=0;x<width;x++){
+        let rs=0,gs=0,bs=0,cnt=0;
+        for(let dy=-radius;dy<=radius;dy++){ const yy=y+dy; if(yy<0||yy>=height) continue;
+          for(let dx=-radius;dx<=radius;dx++){ const xx=x+dx; if(xx<0||xx>=width) continue;
+            const i=(yy*width+xx)*4; rs+=src[i]; gs+=src[i+1]; bs+=src[i+2]; cnt++; } }
+        const o=(y*width+x)*4; out[o]=rs/cnt; out[o+1]=gs/cnt; out[o+2]=bs/cnt; out[o+3]=255;
+      }}
       id.data.set(out); ctx.putImageData(id,0,0);
     }
     function binarize(ctx, threshold=160, invert=false){
-      const {width, height} = ctx.canvas;
-      const id = ctx.getImageData(0,0,width,height);
-      const d = id.data;
-      for(let i=0;i<d.length;i+=4){
-        const g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-        const v = (g>threshold)?255:0;
-        const px = invert ? 255-v : v;
-        d[i]=d[i+1]=d[i+2]=px; d[i+3]=255;
-}
-      ctx.putImageData(id,0,0);
+      const {width,height}=ctx.canvas; const id=ctx.getImageData(0,0,width,height); const d=id.data;
+      for(let i=0;i<d.length;i+=4){ const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const v=(g>threshold)?255:0; const px=invert?255-v:v;
+        d[i]=d[i+1]=d[i+2]=px; d[i+3]=255; } ctx.putImageData(id,0,0);
     }
     function unsharp(ctx, amount=0.6){
-      const {width, height} = ctx.canvas;
-      const base = ctx.getImageData(0,0,width,height);
-      const blurCv = document.createElement('canvas');
-      blurCv.width=width; blurCv.height=height;
-      const bctx = blurCv.getContext('2d');
-      bctx.putImageData(base,0,0);
-      boxBlur(bctx, 1);
-      const blur = bctx.getImageData(0,0,width,height).data;
-      const src = base.data;
+      const {width,height}=ctx.canvas; const base=ctx.getImageData(0,0,width,height);
+      const blurCv=document.createElement('canvas'); blurCv.width=width; blurCv.height=height;
+      const bctx=blurCv.getContext('2d'); bctx.putImageData(base,0,0); boxBlur(bctx,1);
+      const blur=bctx.getImageData(0,0,width,height).data; const src=base.data;
       for(let i=0;i<src.length;i+=4){
-        src[i]   = Math.min(255, Math.max(0, src[i]   + (src[i]-blur[i])  * amount));
-        src[i+1] = Math.min(255, Math.max(0, src[i+1] + (src[i+1]-blur[i+1])* amount));
-        src[i+2] = Math.min(255, Math.max(0, src[i+2] + (src[i+2]-blur[i+2])* amount));
-      }
-      ctx.putImageData(base,0,0);
+        src[i]=Math.min(255,Math.max(0,src[i]+(src[i]-blur[i])*amount));
+        src[i+1]=Math.min(255,Math.max(0,src[i+1]+(src[i+1]-blur[i+1])*amount));
+        src[i+2]=Math.min(255,Math.max(0,src[i+2]+(src[i+2]-blur[i+2])*amount));
+      } ctx.putImageData(base,0,0);
     }
     function upscale(srcCanvas, scale=2){
-      const o=document.createElement('canvas');
-      o.width=Math.round(srcCanvas.width*scale);
-      o.height=Math.round(srcCanvas.height*scale);
-      const c=o.getContext('2d');
-      c.imageSmoothingEnabled=true;
-      c.drawImage(srcCanvas,0,0,o.width,o.height);
-      return o;
+      const o=document.createElement('canvas'); o.width=Math.round(srcCanvas.width*scale); o.height=Math.round(srcCanvas.height*scale);
+      const c=o.getContext('2d'); c.imageSmoothingEnabled=true; c.drawImage(srcCanvas,0,0,o.width,o.height); return o;
     }
     async function ocrVariants(cv){
-      const variants=[];
-      const scales=[1.6, 2.0, 3.0];
-      const thresholds=[140, 160, 180];
-      const inverts=[false, true];
-
+      const variants=[]; const scales=[1.6,2.0,3.0]; const thresholds=[140,160,180]; const inverts=[false,true];
       for(const sc of scales){
-        const up = upscale(cv, sc);
-        const c = up.getContext('2d');
-        unsharp(c, 0.6);
-        for(const th of thresholds){
-          for(const inv of inverts){
-            const test = document.createElement('canvas');
-            test.width=up.width; test.height=up.height;
-            const tc = test.getContext('2d');
-            tc.drawImage(up,0,0);
-            binarize(tc, th, inv);
-            const { data:{ text } } = await Tesseract.recognize(
-              test.toDataURL(), 'eng',
-              {
-                tessedit_char_whitelist:'0123456789',
-                tessedit_pageseg_mode: 7,
-                classify_bln_numeric_mode: 1
-              }
-            );
-            const d = (text||'').replace(/\D+/g,'').slice(0,5);
-            if (d) variants.push(d);
-}
-        }
+        const up=upscale(cv,sc); const c=up.getContext('2d'); unsharp(c,0.6);
+        for(const th of thresholds){ for(const inv of inverts){
+          const test=document.createElement('canvas'); test.width=up.width; test.height=up.height;
+          const tc=test.getContext('2d'); tc.drawImage(up,0,0); binarize(tc,th,inv);
+          const {data:{text}}=await Tesseract.recognize(test.toDataURL(),'eng',
+            { tessedit_char_whitelist:'0123456789', tessedit_pageseg_mode:7, classify_bln_numeric_mode:1 });
+          const d=(text||'').replace(/\D+/g,'').slice(0,5); if(d) variants.push(d);
+        }}
       }
-      const count = {};
-      for(const v of variants){ count[v]=(count[v]||0)+1; }
-      let best='', score=-1;
-      Object.keys(count).forEach(k=>{
-        const s = count[k] + (k.length===5?2:0);
-        if(s>score){ score=s; best=k; }
-      });
+      const count={}; for(const v of variants){ count[v]=(count[v]||0)+1; }
+      let best='',score=-1; Object.keys(count).forEach(k=>{ const s=count[k]+(k.length===5?2:0); if(s>score){score=s;best=k;} });
       return best.slice(0,5);
     }
 
-    // ===== 相机识别（带降级） =====
-    ocrBtn.addEventListener('click', async ()=>{
-      const t = i18n[lang];
-      err.textContent='';
-      // 优先：getUserMedia
-      let snapshotURL = null;
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (isSecureContext || location.hostname==='localhost')) {
-        try{
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video:{ facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:720} },
-            audio:false
-          });
-          const video = document.createElement('video');
-          video.setAttribute('playsinline','true');
-          video.muted = true;
-          video.srcObject = stream;
-          await video.play();
-          const w = video.videoWidth, h = video.videoHeight;
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d', { willReadFrequently:true });
-          ctx.drawImage(video, 0, 0, w, h);
-          stream.getTracks().forEach(t=>t.stop());
-          snapshotURL = canvas.toDataURL();
-        }catch(e){
-          // 忽略，走降级
-        }
-      }
-      // 降级：调用文件输入拍照/选图
-      if(!snapshotURL){
-        fileInput.value = "";
-        fileInput.click();
-        const imgURL = await new Promise(resolve=>{
-          fileInput.onchange = ()=>{
-            if(fileInput.files && fileInput.files[0]){
-              const fr = new FileReader();
-              fr.onload = ()=> resolve(fr.result);
-              fr.readAsDataURL(fileInput.files[0]);
-            } else resolve(null);
-          };
+    /* ===== 相机控制（视频预览 + 降级拍照） ===== */
+let mediaStream=null;
+    function canUseGUM(){
+      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) &&
+             (window.isSecureContext || location.hostname==='localhost');
+    }
+    async function startCamera(){
+      const t=i18n[lang]; err.textContent='';
+      if(!canUseGUM()){ err.textContent=t.errCam+"非 HTTPS 或浏览器不支持，将使用拍照/选图方式"; return; }
+      try{
+        mediaStream=await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false
         });
-        snapshotURL = imgURL;
+        preview.srcObject=mediaStream;
+        await new Promise(res=>{
+          if(preview.readyState>=2) res();
+          else preview.onloadedmetadata=res;
+        });
+        await preview.play().catch(()=>{});
+      }catch(e){
+        err.textContent=t.errCam+(e?.message||e)+"；将使用拍照/选图方式。";
       }
-      if(!snapshotURL){ err.textContent = i18n[lang].errCam + "无可用相机或未选择图片"; return; }
+    }
+    function stopCamera(){
+      if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+      preview.srcObject=null;
+    }
+    async function captureAndOCRFromVideo(){
+      if(!(preview.videoWidth>0)){ err.textContent=i18n[lang].errCam+"相机未就绪"; return; }
+      frame.width=preview.videoWidth; frame.height=preview.videoHeight;
+      const ctx=frame.getContext('2d',{willReadFrequently:true});
+      ctx.drawImage(preview,0,0,frame.width,frame.height);
+      await doOCROnDataURL(frame.toDataURL('image/jpeg',0.92));
+    }
+    async function captureAndOCRByFile(){
+      fileInput.value=''; fileInput.click();
+      const imgURL=await new Promise(resolve=>{
+        fileInput.onchange=()=>{
+          if(fileInput.files && fileInput.files[0]){
+            const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.readAsDataURL(fileInput.files[0]);
+          } else resolve(null);
+        };
+      });
+      if(imgURL) await doOCROnDataURL(imgURL);
+      else err.textContent=i18n[lang].errCam+'未选择图片';
+    }
+    async function doOCROnDataURL(url){
+      const t=i18n[lang];
+      const img=new Image(); img.src=url; await img.decode();
+      const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+      const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0);
+      const roiCanvas=cropROI(cx);
+      const digits=await ocrVariants(roiCanvas);
+      if(digits && digits.length===5){ sn.value=digits; await compute(); }
+      else err.textContent=t.errOCR;
+    }
 
-      // OCR 处理
-      const img = new Image();
-      img.src = snapshotURL;
-      await img.decode();
-      const c = document.createElement('canvas');
-      c.width = img.naturalWidth; c.height = img.naturalHeight;
-      const cx = c.getContext('2d', { willReadFrequently:true });
-      cx.drawImage(img,0,0);
-      const roiCanvas = cropROI(cx);
-      const digits = await ocrVariants(roiCanvas);
-      if(digits && digits.length===5){
-sn.value = digits;
-        await compute();
-      }else{
-        err.textContent = t.errOCR;
-      }
+    // 展示面板并（尽量）直接启动相机（保证视频框出现）
+ocrBtn.addEventListener('click', ()=>{ camPanel.hidden=false; startCamera(); });
+    startCam.addEventListener('click', startCamera);
+    snap.addEventListener('click', async ()=>{
+      if(mediaStream) await captureAndOCRFromVideo();
+      else await captureAndOCRByFile();
     });
+    closeCam.addEventListener('click', ()=>{ stopCamera(); camPanel.hidden=true; });
 
-    // ===== 语音识别：支持中文 & 英文数字 =====
+    /* ===== 语音识别：中文 + 英文词到数字 ===== */
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-
     function mapChineseDigitsToArabic(txt){
-      const map = {'零':'0','〇':'0','○':'0','Ｏ':'0','O':'0','o':'0','０':'0',
-                   '一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9'};
+      const map={'零':'0','〇':'0','○':'0','Ｏ':'0','O':'0','o':'0','０':'0',
+                 '一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9'};
       return txt.replace(/[零〇○ＯOo０一二三四五六七八九]/g, ch => map[ch] || ch);
     }
     function mapEnglishDigitsToArabic(txt){
-      // 处理 "zero/oh/o", "one", "two", ..., 支持连读连写、连字符
-      const words = [
-        ['zero','oh','o','owe','o.','o,'], ['one'], ['two','to','too'], ['three'], ['four','for'], ['five'],
-        ['six'], ['seven'], ['eight','ate'], ['nine']
-      ];
-      let s = ' ' + txt.toLowerCase().replace(/[-,._]/g,' ') + ' ';
-      // 逐个数字词替换
-      words.forEach((alts, d)=>{
-        alts.forEach(w=>{
-          const re = new RegExp('\\b'+w+'\\b','g');
-          s = s.replace(re, ' '+d+' ');
-        });
-      });
+      // 处理 oh/zero/one/two/.../nine，含常见同音和误识别
+      const words=[['zero','oh','o','owe'],['one'],['two','to','too'],['three'],['four','for'],['five'],
+                   ['six'],['seven'],['eight','ate'],['nine']];
+      let s=' '+txt.toLowerCase().replace(/[-,._]/g,' ')+' ';
+      words.forEach((alts,d)=>alts.forEach(w=>{ s=s.replace(new RegExp('\\b'+w+'\\b','g'),' '+d+' ');} ));
       return s.replace(/\s+/g,' ');
     }
-
     voiceBtn.addEventListener('click', ()=>{
-      const t = i18n[lang];
-      err.textContent = '';
-      if(!SpeechRec){ err.textContent = t.errASRNo; return; }
-      // 先按当前 UI 语言启动；若不成，再用另一种语言兜底
-      const tryRecognize = (langCode)=> new Promise((resolve,reject)=>{
-        const rec = new SpeechRec();
-        rec.lang = langCode;
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-        let done=false;
-        rec.onresult = (ev)=>{ done=true; resolve(ev.results[0][0].transcript || ''); };
-        rec.onerror  = (e)=>{ if(!done) reject(e); };
-        rec.onend    = ()=>{ if(!done) resolve(''); };
+      const t=i18n[lang]; err.textContent='';
+      if(!SpeechRec){ err.textContent=t.errASRNo; return; }
+      const tryRec = (code)=> new Promise((resolve,reject)=>{
+        const rec=new SpeechRec(); rec.lang=code; rec.interimResults=false; rec.maxAlternatives=1;
+        let done=false; rec.onresult=(ev)=>{done=true; resolve(ev.results[0][0].transcript||'');};
+        rec.onerror=(e)=>{ if(!done) reject(e); }; rec.onend=()=>{ if(!done) resolve(''); };
         try{ rec.start(); }catch(e){ reject(e); }
       });
-
       (async ()=>{
-        err.textContent = t.tipListening;
-        let txt = '';
-        try { txt = await tryRecognize(lang==='zh' ? 'zh-CN' : 'en-US'); } catch(_){}
-        if(!txt){ try { txt = await tryRecognize(lang==='zh' ? 'en-US' : 'zh-CN'); } catch(_){ } }
-        if(!txt){ err.textContent = t.errASR; return; }
-
-        // 中文&英文双通道归一
-        let norm = mapChineseDigitsToArabic(txt);
-        norm = mapEnglishDigitsToArabic(norm);
-        const digits = norm.replace(/\D+/g,'').slice(0,5);
-
-        if(digits.length===5){
-          sn.value = digits;
-          err.textContent = '';
-          await compute();
-        }else{
-          err.textContent = t.errNaN + '（' + txt + '）';
-        }
+        err.textContent=t.tipListening;
+        let txt=''; try{ txt=await tryRec(lang==='zh'?'zh-CN':'en-US'); }catch(_){}
+        if(!txt){ try{ txt=await tryRec(lang==='zh'?'en-US':'zh-CN'); }catch(_){} }
+        if(!txt){ err.textContent=t.errASR; return; }
+        let norm=mapChineseDigitsToArabic(txt);
+        norm=mapEnglishDigitsToArabic(norm);
+        const digits=norm.replace(/\D+/g,'').slice(0,5);
+        if(digits.length===5){ sn.value=digits; err.textContent=''; await compute(); }
+        else err.textContent=t.errNaN+'（'+txt+'）';
       })();
     });
 
-    // ===== 初始化 =====
+    /* ===== 初始化 ===== */
     applyI18n();
   </script>
 </body>
