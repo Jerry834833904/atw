@@ -3,39 +3,35 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>中国象棋 · Supabase 实时联机版（自动进房间）</title>
+<title>中国象棋 · Supabase 实时联机（GitHub Pages 版）</title>
 <style>
   :root{
     --bg:#f5f5f7; --ink:#111; --muted:#6b7280; --card:#fff; --border:#e5e7eb; --accent:#16a34a;
-    --red:#c81e1e; --black:#111827; --board:#f6d191; --grid:#333;
+    --board:#f6d191; --grid:#333;
   }
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);
        font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
   .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
-  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
-  .pane{flex:1 1 320px;max-width:520px}
-  .pane h3{margin:.2em 0 .4em 0;font-size:16px;color:#333}
-  textarea{width:100%;min-height:120px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .muted{color:var(--muted)}
+  .tag{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;background:#fff}
+  .tag.ok{color:var(--accent);border-color:var(--accent)}
+  input[type=text]{padding:8px 10px;border:1px solid var(--border);border-radius:8px;min-width:200px}
   button{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 14px;cursor:pointer}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   #board{display:block;touch-action:manipulation;max-width:96vw;height:auto}
   .status{font-weight:600}
-  .muted{color:var(--muted)}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin:.4em 0;align-items:center}
-  .tag{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;background:#fff}
-  .tag.ok{color:var(--accent);border-color:var(--accent)}
-  input[type=text]{padding:8px 10px;border:1px solid var(--border);border-radius:8px;min-width:180px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>中国象棋</h1>
+  <h1>中国象棋 · 在线对弈</h1>
 
   <div class="card" style="width:min(980px,96vw)">
     <div class="controls">
-      <label class="muted">房间号：</label>
+      <label class="muted">房间号</label>
       <input id="roomInput" type="text" placeholder="例如：ATW888" maxlength="16"/>
       <button class="primary" id="joinBtn">创建/加入</button>
       <button id="copyBtn">复制房间号</button>
@@ -44,39 +40,39 @@
       <span class="tag" id="roleTag">未入房</span>
       <span class="tag" id="connTag">未连接</span>
     </div>
-    <div class="muted">提示：把房间号发给朋友，双方输入同一个房间号后点击“创建/加入”即可自动连线。默认先占红座，已占则占黑座，满员则观战。支持多人旁观，自动同步棋局。</div>
+    <div class="muted">把房间号发给朋友，双方输入同号后“创建/加入”即可自动连线。先占红，再占黑，满员则观战。支持多人旁观与状态同步。</div>
   </div>
 
   <div class="card">
     <canvas id="board" width="720" height="800" aria-label="Chinese Chess board"></canvas>
-    <div class="status" id="status">输入房间号后点击“创建/加入”。</div>
+    <div class="status" id="status">请输入房间号后开始。</div>
   </div>
 </div>
 
-<!-- UMD 版 supabase-js -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.1/dist/umd/supabase.js"></script>
-
 <script>
 (() => {
-  // ===== 配置（已填入你的项目，若需替换请编辑下方常量） =====
+  // ===== Supabase 固定配置（可直接部署 GitHub Pages 使用） =====
   const SUPABASE_URL = "https://gmtnwlxbhooxhwwiqohe.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtdG53bHhiaG9veGh3d2lxb2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODU0MDAwMDAsImV4cCI6Mjk0MTE3NjAwMH0.VxV2E6y6o9c3nqzJ2z6aQJw6EoTjWzF8xvV8oKJ-demo"; // 匿名公钥，前端可公开
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtdG53bHhiaG9veGh3d2lxb2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODU0MDAwMDAsImV4cCI6Mjk0MTE3NjAwMH0.VxV2E6y6o9c3nqzJ2z6aQJw6EoTjWzF8xvV8oKJ-demo";
 
-  // ===== 全局状态 =====
-  const COLS = 9, ROWS = 10;
-  const canvas = document.getElementById('board');
-  const ctx = canvas.getContext('2d');
-  let marginX = 40, marginY = 40;
-  let gridW = () => (canvas.width - marginX*2) / (COLS - 1);
-  let gridH = () => (canvas.height - marginY*2) / (ROWS - 1);
-  const statusEl = document.getElementById('status');
-  const roleTag = document.getElementById('roleTag');
-  const connTag = document.getElementById('connTag');
+  // ===== DOM =====
   const roomInput = document.getElementById('roomInput');
   const joinBtn = document.getElementById('joinBtn');
   const copyBtn = document.getElementById('copyBtn');
   const switchSeatBtn = document.getElementById('switchSeatBtn');
   const resetBtn = document.getElementById('resetBtn');
+  const roleTag = document.getElementById('roleTag');
+  const connTag = document.getElementById('connTag');
+  const statusEl = document.getElementById('status');
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+
+  // ===== 状态 =====
+  const COLS = 9, ROWS = 10;
+  let marginX = 40, marginY = 40;
+  let gridW = () => (canvas.width - marginX*2) / (COLS - 1);
+  let gridH = () => (canvas.height - marginY*2) / (ROWS - 1);
 
   const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   const clientId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '_' + Math.random().toString(36).slice(2));
@@ -86,11 +82,14 @@
   let channel = null;
   let roomId = null;
 
-  // ========== 棋局逻辑 ==========
+  function setStatus(s){ statusEl.textContent = s; }
+  function updateConnTag(ok){ connTag.textContent = ok ? '已连接' : '未连接'; connTag.className = 'tag' + (ok?' ok':''); }
+  function setRoleTag(){ roleTag.textContent = (mySide==='r'?'红方': (mySide==='b'?'黑方':'观战')); }
+
+  // ===== 棋盘逻辑 =====
   function initGame() {
     board = Array.from({length:ROWS}, () => Array(COLS).fill(null));
     turn = 'r'; selected = null; legalMoves = []; lastMove = null; gameOver = false;
-
     const put = (x,y,side,type) => board[y][x] = {side, type};
     // 黑方（上）
     ['R','H','E','A','K','A','E','H','R'].forEach((t,i)=>put(i,0,'b',t));
@@ -103,7 +102,6 @@
   }
   initGame();
 
-  function setStatus(s){ statusEl.textContent = s; }
   function inBounds(x,y){ return x>=0 && x<COLS && y>=0 && y<ROWS; }
   function palace(side, x,y){ const inX=(x>=3 && x<=5); return side==='r' ? (inX && y>=7 && y<=9) : (inX && y>=0 && y<=2); }
   function riverCrossed(side,y){ return side==='r' ? y<=4 : y>=5; }
@@ -113,7 +111,8 @@
       const [a,b] = y1<y2 ? [y1,y2] : [y2,y1];
       for(let y=a+1;y<b;y++) if(board[y][x1]) return false;
       return true;
-    } else if(y1===y2){
+    }
+    if(y1===y2){
       const [a,b] = x1<x2 ? [x1,x2] : [x2,x1];
       for(let x=a+1;x<b;x++) if(board[y1][x]) return false;
       return true;
@@ -248,7 +247,7 @@
     return '?';
   }
 
-  // ========== 绘制 ==========
+  // ===== 绘制 =====
   function resize() {
     const w = Math.min(720, Math.floor(window.innerWidth*0.96));
     const h = Math.round(w * (10/9));
@@ -334,7 +333,7 @@
 
   function drawAll(){ drawBoard(); drawPieces(); }
 
-  // ========== 交互 ==========
+  // ===== 交互 =====
   canvas.addEventListener('click', onTap);
   canvas.addEventListener('touchend', (e)=>{ e.preventDefault(); const t=e.changedTouches[0]; onTap(t); }, {passive:false});
 
@@ -391,46 +390,19 @@
   }
   resetBtn.onclick = ()=> resetGame(true);
 
-  // ========== 联机（Supabase Realtime） ==========
-  function sanitizeRoomId(v){
-    return (v||'').trim().replace(/[^a-zA-Z0-9_-]/g,'').slice(0,16) || ('R' + Math.random().toString(36).slice(2,8).toUpperCase());
-  }
+  // ===== Realtime 联机 =====
+  function sanitizeRoomId(v){ return (v||'').trim().replace(/[^a-zA-Z0-9_-]/g,'').slice(0,16) || ('R' + Math.random().toString(36).slice(2,8).toUpperCase()); }
 
-  const joinBtnHandler = async ()=>{
-    const id = sanitizeRoomId(roomInput.value);
-    roomInput.value = id;
-    if(channel) { try{ await channel.unsubscribe(); }catch(e){} channel=null; }
-    roomId = id;
-    connectRoom();
-  };
-  joinBtn.addEventListener('click', joinBtnHandler);
-
-  copyBtn.onclick = async ()=>{
-    const id = roomInput.value.trim();
-    if(!id) return;
-    try { await navigator.clipboard.writeText(id); setStatus('已复制房间号：'+id); } catch(e){ setStatus('复制失败，请手动复制。'); }
-  };
-
+  joinBtn.onclick = async ()=>{ const id = sanitizeRoomId(roomInput.value); roomInput.value = id; if(channel) { try{ await channel.unsubscribe(); }catch(e){} channel=null; } roomId = id; connectRoom(); };
+  copyBtn.onclick = async ()=>{ const id = roomInput.value.trim(); if(!id) return; try { await navigator.clipboard.writeText(id); setStatus('已复制房间号：'+id); } catch(e){ setStatus('复制失败，请手动复制。'); } };
   switchSeatBtn.onclick = () => attemptSwitchSeat();
 
-  function updateConnTag(ok){
-    connTag.textContent = ok ? '已连接' : '未连接';
-    connTag.className = 'tag' + (ok?' ok':'');
-  }
-
-  function setRoleTag(){
-    roleTag.textContent = (mySide==='r'?'红方': (mySide==='b'?'黑方':'观战'));
-  }
-
   function connectRoom(){
-    if(!roomId) return;
-    channel = supa.channel('room:'+roomId, {
-      config: { broadcast: { self: false }, presence: { key: clientId } }
-    });
+    channel = supa.channel('room:'+roomId, { config: { broadcast: { self: false }, presence: { key: clientId } } });
 
-    channel.on('broadcast', { event:'move' }, (payload)=>{ const d=payload.payload; doMove(d.sx,d.sy,d.tx,d.ty,false); });
+    channel.on('broadcast', { event:'move' }, ({payload})=>{ doMove(payload.sx,payload.sy,payload.tx,payload.ty,false); });
     channel.on('broadcast', { event:'reset' }, ()=>{ resetGame(false); });
-    channel.on('broadcast', { event:'snapshot' }, (payload)=>{ const s=payload.payload; loadSnapshot(s); });
+    channel.on('broadcast', { event:'snapshot' }, ({payload})=>{ loadSnapshot(payload); });
 
     channel.on('presence', { event:'sync' }, () => { handlePresenceSync(); });
     channel.on('presence', { event:'join' }, () => {
@@ -485,29 +457,13 @@
     setStatus('已切换为：'+(mySide==='r'?'红方':'黑方'));
   }
 
-  function broadcast(event, payload){
-    if(!channel) return;
-    channel.send({ type:'broadcast', event, payload });
-  }
+  function broadcast(event, payload){ if(!channel) return; channel.send({ type:'broadcast', event, payload }); }
+  function encodeBoard(){ return board.map(row => row.map(c => c ? (c.side + c.type) : '')); }
+  function decodeBoard(arr){ for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){ const v=arr[y][x]; board[y][x] = v? {side:v[0], type:v[1]} : null; } }
+  function sendSnapshot(){ const snap={ board: encodeBoard(), turn, lastMove, gameOver }; broadcast('snapshot', snap); }
+  function loadSnapshot(s){ if(!s || !s.board) return; decodeBoard(s.board); turn = s.turn||'r'; lastMove = s.lastMove||null; gameOver=!!s.gameOver; selected=null; legalMoves=[]; drawAll(); setStatus('已同步棋局。轮到'+(turn==='r'?'红':'黑')+'方。'); }
 
-  function encodeBoard(){
-    return board.map(row => row.map(c => c ? (c.side + c.type) : ''));
-  }
-  function decodeBoard(arr){
-    for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){ const v=arr[y][x]; board[y][x] = v? {side:v[0], type:v[1]} : null; }
-  }
-  function sendSnapshot(){
-    const snap={ board: encodeBoard(), turn, lastMove, gameOver };
-    broadcast('snapshot', snap);
-  }
-  function loadSnapshot(s){
-    if(!s || !s.board) return;
-    decodeBoard(s.board); turn = s.turn||'r'; lastMove = s.lastMove||null; gameOver=!!s.gameOver; selected=null; legalMoves=[];
-    drawAll();
-    setStatus('已同步棋局。轮到'+(turn==='r'?'红':'黑')+'方。');
-  }
-
-  // ========== 初始 UI ==========
+  // 初始 UI
   roomInput.value = 'ATW' + Math.random().toString(36).slice(2,6).toUpperCase();
   roleTag.textContent = '未入房';
   updateConnTag(false);
