@@ -64,8 +64,8 @@
       <div id="err" class="err"></div>
       <div id="res" class="result" data-raw-pwd=""></div>
     </div>
-
     <div id="camPanel" class="cam-panel" hidden>
+
       <!-- 视频区 -->
       <div class="video-wrap">
         <video id="preview" playsinline autoplay muted></video>
@@ -92,7 +92,6 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
-    /* ===== 基础与文案（沿用原逻辑） ===== */
     const API_BASE="https://atwjerry.834833904.workers.dev";
     const i18n={ zh:{
         title:"奥特维串焊机4级解锁",placeholder:"请输入5位序列号",gen:"生成密码",ocr:"📷 拍照识别",voice:"🎤 语音识别",
@@ -147,7 +146,6 @@ title:"ATW Stringer L4 Unlock",placeholder:"Enter 5-digit serial number",gen:"Ge
     sn.addEventListener('keydown',e=>{ if(e.key==='Enter') compute(); });
     luggageBtn.addEventListener('click',()=>{ lang=(lang==='zh'?'en':'zh'); applyI18n(); });
 
-    /* ===== OCR / 相机（沿用原稳健流程） ===== */
 function toGray(r,g,b){ return 0.299*r + 0.587*g + 0.114*b; }
     function findDarkBandWithRect(ctx){
       const {width:w,height:h} = ctx.canvas;
@@ -366,12 +364,10 @@ const {width:w,height:h}=ctx.canvas; const src=ctx.getImageData(0,0,w,h); const 
       if(digits && digits.length===5){ sn.value=digits; await compute(); } else { err.textContent=i18n[lang].errOCR; }
     }
 
-    // “拍照识别”一点击就开相机并开始循环
     ocrBtn.addEventListener('click', async ()=>{
       camPanel.hidden=false;
       await startAutoLoop();
     });
-    // 提前确认（叠加按钮）
     confirmEarly.addEventListener('click', async ()=>{
       const cur=(liveNum.textContent||'').replace(/\D/g,'');
       if(cur.length===5){
@@ -385,7 +381,6 @@ const {width:w,height:h}=ctx.canvas; const src=ctx.getImageData(0,0,w,h); const 
     pickImg.addEventListener('click', pickImageAndOCR);
     closeCam.addEventListener('click', ()=>{ stopCamera(); camPanel.hidden=true; });
 
-    /* ===== 语音识别（保持原中英文逻辑） ===== */
     const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
     function mapChineseDigitsToArabic(txt){
       const map={'零':'0','〇':'0','○':'0','Ｏ':'0','０':'0','一':'1','幺':'1','二':'2','两':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9'};
